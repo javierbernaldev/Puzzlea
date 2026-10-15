@@ -21,7 +21,6 @@ button:disabled{opacity:.6}
 /* inicio */
 .top{display:flex;align-items:center;gap:10px}
 .top h1{margin:0;font-size:26px;flex:1}
-#cloudBtn{background:var(--acc2);color:#10213a;font-size:17px;padding:13px 16px;width:100%}
 #gallery{flex:1;min-height:0;overflow:auto;display:grid;grid-template-columns:repeat(2,1fr);gap:12px;align-content:start;padding:2px}
 @media(min-width:560px){#gallery{grid-template-columns:repeat(3,1fr)}}
 @media(min-width:900px){#gallery{grid-template-columns:repeat(5,1fr)}}
@@ -69,7 +68,6 @@ button:disabled{opacity:.6}
     <h1>🧩 Puzzlea</h1>
     <button id="soundBtn" class="ib" aria-label="Sonido">🔊</button>
   </div>
-  <button id="cloudBtn">☁️ Descargar puzzles</button>
   <div id="gallery"></div>
   <div class="panel">
     <div class="seg" id="modeRow"></div>
@@ -104,7 +102,6 @@ button:disabled{opacity:.6}
 'use strict';
 const $=s=>document.querySelector(s);
 /* Servidor de imágenes: fijo, no se puede cambiar desde la app */
-const SERVER_URL='https://fbm-622215956948-eu-west-1-an.s3.eu-west-1.amazonaws.com/juegos/Puzzlea/';
 const DPR=Math.min(window.devicePixelRatio||1,2.5);
 const NATIVE=!!(window.Capacitor&&window.Capacitor.isNativePlatform&&window.Capacitor.isNativePlatform());
 
@@ -179,92 +176,7 @@ $('#file').onchange=async e=>{
   if(ok){await loadImages();selected=images.length-1;renderGallery();toast('✅ '+ok)}else toast('❌');
 };
 
-/* ---------- Descarga desde el servidor (bucket S3) ---------- */
-/* En la app (Android) se usa la red nativa, que no depende de CORS; en la web, fetch normal. */
-function b64Blob(b64,type){
-  const bin=atob(b64),u8=new Uint8Array(bin.length);
-  for(let i=0;i<bin.length;i++)u8[i]=bin.charCodeAt(i);
-  return new Blob([u8],{type});
-}
-async function httpGet(url,as){            /* as: 'text' | 'blob' */
-  const H=NATIVE&&window.Capacitor.Plugins&&window.Capacitor.Plugins.CapacitorHttp;
-  if(H){
-    let r;
-    try{r=await H.request({url,method:'GET',responseType:as==='blob'?'blob':'text',connectTimeout:15000,readTimeout:60000})}
-    catch(e){r=null}                       /* si falla el plugin, se prueba con fetch */
-    if(r){
-      if(r.status<200||r.status>=300)throw new Error('HTTP '+r.status);
-      if(as==='blob'){
-        const h=r.headers||{};
-        return b64Blob(r.data,h['Content-Type']||h['content-type']||'image/jpeg');
-      }
-      return typeof r.data==='string'?r.data:String(r.data);
-    }
-  }
-  const r=await fetch(url);
-  if(!r.ok)throw new Error('HTTP '+r.status);
-  return as==='blob'?r.blob():r.text();
-}
-const IMG_RE=/\.(jpe?g|png|webp|gif|bmp|avif)$/i;
-const keyUrl=(origin,key)=>origin+'/'+key.split('/').map(encodeURIComponent).join('/');
-async function listBucket(base){
-  const u=new URL(base);
-  const prefix=decodeURIComponent(u.pathname.replace(/^\//,''));
-  const keys=[];let token='';
-  do{
-    const q=new URL(u.origin+'/');
-    q.searchParams.set('list-type','2');
-    q.searchParams.set('prefix',prefix);
-    if(token)q.searchParams.set('continuation-token',token);
-    const x=new DOMParser().parseFromString(await httpGet(q.toString(),'text'),'application/xml');
-    for(const k of x.getElementsByTagName('Key'))keys.push(k.textContent);
-    const trunc=x.getElementsByTagName('IsTruncated')[0];
-    const next=x.getElementsByTagName('NextContinuationToken')[0];
-    token=(trunc&&trunc.textContent==='true'&&next)?next.textContent:'';
-  }while(token);
-  /* images_default/ son los puzzles por defecto (ya van dentro de la app): no se descargan como puzzles */
-  return {origin:u.origin,keys:keys.filter(k=>IMG_RE.test(k)&&!k.startsWith(prefix+'images_default/'))};
-}
-function netError(e){
-  const m=String(e&&e.message||e);
-  if(/HTTP 403/.test(m))return '🔒 403';
-  if(/HTTP 404/.test(m))return '❓ 404';
-  if(/HTTP \d+/.test(m))return '⚠️ '+m;
-  return '📡 ✖';
-}
-let downloading=false;
-/* Reemplaza TODOS los puzzles descargados/subidos por los del servidor.
-   Los puzzles por defecto (carpeta images/ del repo) no se tocan. */
-async function downloadAll(){
-  if(downloading)return;
-  const btn=$('#cloudBtn'),label='☁️ Descargar puzzles';
-  downloading=true;btn.disabled=true;btn.textContent='☁️ …';
-  try{
-    const {origin,keys}=await listBucket(SERVER_URL);
-    if(!keys.length){toast('📭');return}            /* servidor vacío: no se borra nada */
-    const old=new Map((await DB.all()).filter(r=>r.src).map(r=>[r.src,r.data]));
-    const fresh=[];let fail=0;
-    for(let i=0;i<keys.length;i++){
-      btn.textContent='☁️ '+(i+1)+' / '+keys.length;
-      try{
-        const blob=await httpGet(keyUrl(origin,keys[i]),'blob');
-        fresh.push({src:keys[i],data:await fileToSquare(blob)});
-      }catch(e){
-        fail++;
-        if(old.has(keys[i]))fresh.push({src:keys[i],data:old.get(keys[i])});   /* se conserva la copia anterior */
-      }
-    }
-    await DB.clear();
-    for(const f of fresh)await DB.add(f.data,f.src);
-    selected=0;await loadImages();
-    toast(fail?('✅ '+(keys.length-fail)+'  ⚠️ '+fail):('✅ '+keys.length));
-  }catch(e){
-    toast(netError(e));
-  }finally{
-    downloading=false;btn.disabled=false;btn.textContent=label;
-  }
-}
-$('#cloudBtn').onclick=downloadAll;
+
 
 /* ---------- Controles con iconos ---------- */
 function gridSvg(n,hole){
