@@ -59,6 +59,16 @@ button:disabled{opacity:.6}
 #win .go{background:var(--ok);color:#0b3d1f}
 @keyframes pop{0%{transform:scale(.3) rotate(-20deg);opacity:0}70%{transform:scale(1.2) rotate(6deg)}100%{transform:scale(1);opacity:1}}
 #toast{pointer-events:none;max-width:86vw;text-align:center;position:fixed;left:50%;top:76px;transform:translateX(-50%);background:#000d;padding:10px 16px;border-radius:20px;display:none;z-index:99;font-size:15px}
+#pin{position:fixed;inset:0;background:#000c;display:none;align-items:center;justify-content:center;z-index:90}
+#pin.on{display:flex}
+#pin .box{background:var(--card);border-radius:24px;padding:20px;display:flex;flex-direction:column;align-items:center;gap:14px}
+#pin .dots{display:flex;gap:14px;height:22px}
+#pin .dots i{width:20px;height:20px;border-radius:50%;border:3px solid var(--mute)}
+#pin .dots i.f{background:var(--acc);border-color:var(--acc)}
+#pin .keys{display:grid;grid-template-columns:repeat(3,64px);gap:10px}
+#pin .keys button{height:64px;font-size:26px;background:#ffffff18;padding:0}
+#pin.bad .box{animation:shake .35s}
+@keyframes shake{25%{transform:translateX(-12px)}75%{transform:translateX(12px)}}
 </style>
 </head>
 <body>
@@ -74,6 +84,16 @@ button:disabled{opacity:.6}
     <div class="seg" id="sizeRow"></div>
   </div>
   <button id="playBtn" class="ib" aria-label="Jugar">▶</button>
+  <div id="pin"><div class="box">
+    <div style="font-size:34px">🔒</div>
+    <div class="dots"><i></i><i></i><i></i><i></i></div>
+    <div class="keys">
+      <button>1</button><button>2</button><button>3</button>
+      <button>4</button><button>5</button><button>6</button>
+      <button>7</button><button>8</button><button>9</button>
+      <button data-k="x" aria-label="Cerrar">✖</button><button>0</button><button data-k="b" aria-label="Borrar">⌫</button>
+    </div>
+  </div></div>
   <input type="file" id="file" accept="image/*" multiple hidden>
 </div>
 
@@ -152,8 +172,25 @@ function renderGallery(){
     g.appendChild(d);
   });
   const a=document.createElement('div');a.className='thumb add';a.textContent='+';
-  a.onclick=()=>$('#file').click();g.appendChild(a);
+  a.onclick=askPin;g.appendChild(a);
 }
+
+/* Añadir fotos pide una clave (para que los niños no las cambien) */
+const PIN='2202';
+let pinVal='';
+function pinDots(){document.querySelectorAll('#pin .dots i').forEach((d,i)=>d.classList.toggle('f',i<pinVal.length))}
+function askPin(){pinVal='';pinDots();$('#pin').classList.add('on')}
+document.querySelectorAll('#pin .keys button').forEach(b=>b.onclick=()=>{
+  const k=b.dataset.k;
+  if(k==='x'){$('#pin').classList.remove('on');return}
+  if(k==='b'){pinVal=pinVal.slice(0,-1);pinDots();return}
+  if(pinVal.length>=4)return;
+  pinVal+=b.textContent;pinDots();
+  if(pinVal.length===4){
+    if(pinVal===PIN){$('#pin').classList.remove('on');pinVal='';$('#file').click()}
+    else{const p=$('#pin');p.classList.add('bad');setTimeout(()=>{p.classList.remove('bad');pinVal='';pinDots()},400)}
+  }
+});
 
 /* recorta al cuadrado y reduce a 1024 */
 function fileToSquare(file){
@@ -175,6 +212,8 @@ $('#file').onchange=async e=>{
   for(const f of files){try{await DB.add(await fileToSquare(f));ok++}catch(err){}}
   if(ok){await loadImages();selected=images.length-1;renderGallery();toast('✅ '+ok)}else toast('❌');
 };
+
+
 
 
 
@@ -445,17 +484,23 @@ function newShuffle(){
     jig={E:newEdges(N),placed:new Set(),pieces:[]};
     buildJigsawView();
   }else{
-    const n=N*N;order=[...Array(n).keys()];empty=n-1;let last=-1;
-    for(let k=0;k<n*30;k++){
-      const nb=neighbors(empty).filter(x=>x!==last),m=nb[Math.floor(Math.random()*nb.length)];
-      order[empty]=order[m];order[m]=n-1;last=empty;empty=m;
-    }
-    if(order.every((v,i)=>v===i))return newShuffle();
+    const n=N*N,prev=order.join(',');
+    let tries=0;
+    do{
+      order=[...Array(n).keys()];empty=n-1;let last=-1;
+      for(let k=0;k<n*30;k++){
+        let nb=neighbors(empty);
+        if(nb.length>2)nb=nb.filter(x=>x!==last);   /* con solo 2 vecinos (esquinas, 2x2) no se filtra: si no, el barajado era siempre el mismo */
+        const m=nb[Math.floor(Math.random()*nb.length)];
+        order[empty]=order[m];order[m]=n-1;last=empty;empty=m;
+      }
+      tries++;
+    }while((order.every((v,i)=>v===i)||order.join(',')===prev)&&tries<50);
     buildSlideView();
   }
 }
 async function startGame(){
-  if(!images.length){toast('☁️ ⬇');return}
+  if(!images.length){toast('🖼️');return}
   show('game');$('#win').classList.remove('on');
   await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
   try{
