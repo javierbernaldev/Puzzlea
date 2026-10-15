@@ -6,32 +6,41 @@
 <meta name="theme-color" content="#1b1f3b">
 <title>Puzzlea</title>
 <style>
-:root{--bg:#1b1f3b;--card:#262b52;--ink:#f4f5ff;--mute:#9aa0d0;--acc:#ffb703;--acc2:#4cc9f0;--ok:#52d681}
+:root{--bg:#1b1f3b;--card:#262b52;--card2:#323974;--ink:#f4f5ff;--mute:#9aa0d0;--acc:#ffb703;--acc2:#4cc9f0;--ok:#3ddc84}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
 html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,Roboto,sans-serif;overflow:hidden}
 body{padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
-.screen{position:absolute;inset:0;display:none;flex-direction:column;padding:16px;overflow:auto}
+.screen{position:absolute;inset:0;display:none;flex-direction:column;padding:14px;gap:10px}
 .screen.on{display:flex}
-h1{margin:4px 0 2px;font-size:28px}
-.sub{color:var(--mute);margin:0 0 14px;font-size:14px}
-.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-button{font:inherit;border:0;border-radius:12px;padding:12px 16px;background:var(--card);color:var(--ink);font-weight:600}
-button:active{transform:scale(.97)}
+button{font:inherit;border:0;border-radius:16px;background:var(--card);color:var(--ink);font-weight:700;padding:12px 16px;transition:transform .08s}
+button:active{transform:scale(.93)}
 button:disabled{opacity:.6}
-button.pri{background:var(--acc);color:#1b1f3b}
-button.sel{background:var(--acc2);color:#10213a}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-top:12px}
-.thumb{position:relative;aspect-ratio:1;border-radius:14px;background:var(--card) center/cover;border:3px solid transparent}
-.thumb.sel{border-color:var(--acc)}
-.thumb .x{position:absolute;top:4px;right:4px;width:30px;height:30px;padding:0;border-radius:50%;background:#e5484dee;display:none}
-.edit .thumb .x{display:block}
-.add{display:flex;align-items:center;justify-content:center;font-size:40px;color:var(--mute);border:2px dashed var(--mute);background:transparent}
-.opts{margin:14px 0 6px}
-.opts b{display:block;margin-bottom:6px;color:var(--mute);font-size:13px;text-transform:uppercase;letter-spacing:.06em}
-.spacer{flex:1}
+.ib{width:50px;height:50px;padding:0;border-radius:50%;display:grid;place-items:center;font-size:24px;line-height:1;flex:none}
+.ib svg{display:block}
 
-#hud{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;font-variant-numeric:tabular-nums}
-#hud span{background:var(--card);padding:8px 12px;border-radius:10px;font-weight:700}
+/* inicio */
+.top{display:flex;align-items:center;gap:10px}
+.top h1{margin:0;font-size:26px;flex:1}
+#cloudBtn{background:var(--acc2);color:#10213a;font-size:17px;padding:13px 16px;width:100%}
+#gallery{flex:1;min-height:0;overflow:auto;display:grid;grid-template-columns:repeat(2,1fr);gap:12px;align-content:start;padding:2px}
+@media(min-width:560px){#gallery{grid-template-columns:repeat(3,1fr)}}
+@media(min-width:900px){#gallery{grid-template-columns:repeat(5,1fr)}}
+.thumb{position:relative;aspect-ratio:1;border-radius:18px;background:var(--card) center/cover;border:4px solid transparent}
+.thumb.sel{border-color:var(--acc);box-shadow:0 0 0 3px #ffb70055}
+.thumb.sel::after{content:"✓";position:absolute;right:8px;bottom:8px;width:32px;height:32px;border-radius:50%;background:var(--acc);color:#1b1f3b;display:grid;place-items:center;font-weight:900}
+.add{display:grid;place-items:center;font-size:44px;color:var(--mute);border:3px dashed var(--mute);background:transparent}
+.empty{grid-column:1/-1;text-align:center;font-size:64px;padding:30px 0;opacity:.8}
+.panel{background:var(--card);border-radius:20px;padding:10px;display:flex;flex-direction:column;gap:8px}
+.seg{display:flex;gap:8px;justify-content:center}
+.seg button{flex:1;max-width:80px;height:54px;padding:0;display:grid;place-items:center;background:var(--card2);font-size:28px;color:var(--ink)}
+.seg button.sel{background:var(--acc);color:#1b1f3b}
+#playBtn{width:84px;height:84px;font-size:38px;background:var(--ok);color:#0b3d1f;align-self:center;margin-top:2px;padding:0 0 0 6px;box-shadow:0 6px 0 #1f9a55}
+#playBtn:active{transform:translateY(4px);box-shadow:0 2px 0 #1f9a55}
+
+/* juego */
+#hud{display:flex;align-items:center;gap:10px}
+#bar{flex:1;height:18px;border-radius:9px;background:var(--card);overflow:hidden}
+#bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--acc2),var(--ok));border-radius:9px;transition:width .25s}
 #stage{position:relative;flex:1;min-height:0;touch-action:none;isolation:isolate}
 #board{position:absolute;background:#0e1126;border-radius:6px;touch-action:none;overflow:hidden;box-shadow:inset 0 0 0 2px #2c3270}
 #ghost{position:absolute;left:0;top:0;pointer-events:none}
@@ -42,66 +51,50 @@ button.sel{background:var(--acc2);color:#10213a}
 .piece.snap{transition:transform .12s ease-out}
 .tile{position:absolute;background-repeat:no-repeat;transition:left .12s,top .12s;outline:1px solid rgba(0,0,0,.35);outline-offset:-1px}
 .tile.empty{visibility:hidden}
-#win{position:absolute;inset:0;background:rgba(10,12,30,.88);display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;z-index:20}
+#win{position:absolute;inset:0;background:rgba(10,12,30,.9);display:none;flex-direction:column;align-items:center;justify-content:center;gap:22px;z-index:20}
 #win.on{display:flex}
-#win h2{font-size:34px;margin:0;color:var(--ok);animation:pop .6s ease-out}
-@keyframes pop{0%{transform:scale(.4);opacity:0}70%{transform:scale(1.15)}100%{transform:scale(1);opacity:1}}
-#toast{pointer-events:none;max-width:86vw;text-align:center;position:fixed;left:50%;top:70px;transform:translateX(-50%);background:#000c;padding:10px 16px;border-radius:20px;display:none;z-index:99}
+#win .big{font-size:96px;line-height:1;animation:pop .6s ease-out}
+#win .stars{font-size:44px;letter-spacing:6px}
+#win .row{display:flex;gap:22px}
+#win .ib{width:76px;height:76px;font-size:38px}
+#win .go{background:var(--ok);color:#0b3d1f}
+@keyframes pop{0%{transform:scale(.3) rotate(-20deg);opacity:0}70%{transform:scale(1.2) rotate(6deg)}100%{transform:scale(1);opacity:1}}
+#toast{pointer-events:none;max-width:86vw;text-align:center;position:fixed;left:50%;top:76px;transform:translateX(-50%);background:#000d;padding:10px 16px;border-radius:20px;display:none;z-index:99;font-size:15px}
 </style>
 </head>
 <body>
 
 <div id="home" class="screen on">
-  <h1>🧩 Puzzlea</h1>
-  <p class="sub">Elige una imagen o sube las tuyas</p>
-  <div class="row">
-    <button id="cloudBtn">☁ Descargar imágenes</button>
-    <button id="editBtn">Borrar imágenes</button>
+  <div class="top">
+    <h1>🧩 Puzzlea</h1>
+    <button id="soundBtn" class="ib" aria-label="Sonido">🔊</button>
   </div>
-  <div id="gallery" class="grid"></div>
-
-  <div class="opts"><b>Modo</b>
-    <div class="row" id="modeRow">
-      <button data-v="jigsaw">Rompecabezas</button>
-      <button data-v="slide">Deslizante</button>
-    </div>
+  <button id="cloudBtn">☁️ Descargar puzzles</button>
+  <div id="gallery"></div>
+  <div class="panel">
+    <div class="seg" id="modeRow"></div>
+    <div class="seg" id="sizeRow"></div>
   </div>
-  <div class="opts"><b>Dificultad</b>
-    <div class="row" id="sizeRow">
-      <button data-v="2">2×2</button>
-      <button data-v="3">3×3</button>
-      <button data-v="4">4×4</button>
-      <button data-v="5">5×5</button>
-      <button data-v="6">6×6</button>
-    </div>
-  </div>
-  <div class="opts"><b>Sonido</b>
-    <div class="row" id="soundRow">
-      <button data-v="1">Sí</button>
-      <button data-v="0">No</button>
-    </div>
-  </div>
-  <div class="spacer"></div>
-  <button class="pri" id="playBtn" style="padding:16px;font-size:18px;margin-top:12px">▶ Jugar</button>
+  <button id="playBtn" class="ib" aria-label="Jugar">▶</button>
   <input type="file" id="file" accept="image/*" multiple hidden>
 </div>
 
 <div id="game" class="screen">
   <div id="hud">
-    <button id="backBtn">←</button>
-    <span id="moves">0</span>
-    <span id="time">0:00</span>
-    <button id="peekBtn">👁</button>
+    <button id="backBtn" class="ib" aria-label="Inicio">🏠</button>
+    <div id="bar"><i></i></div>
+    <button id="peekBtn" class="ib" aria-label="Ver imagen">👁</button>
+    <button id="soundBtn2" class="ib" aria-label="Sonido">🔊</button>
+    <button id="shuffleBtn" class="ib" aria-label="Reiniciar">↻</button>
   </div>
   <div id="stage"><div id="board"><div id="preview"></div></div></div>
-  <div class="row" style="justify-content:center;margin-top:10px">
-    <button id="shuffleBtn">↻ Reiniciar</button>
-  </div>
   <div id="win">
-    <h2>¡Completado! 🎉</h2>
-    <div id="winStats"></div>
-    <button class="pri" id="againBtn">Jugar otra vez</button>
-    <button id="menuBtn">Menú</button>
+    <div class="big">🎉</div>
+    <div class="stars">⭐⭐⭐</div>
+    <div class="row">
+      <button id="againBtn" class="ib go" aria-label="Otra vez">↻</button>
+      <button id="menuBtn" class="ib" aria-label="Inicio">🏠</button>
+    </div>
   </div>
 </div>
 <div id="toast"></div>
@@ -113,56 +106,52 @@ const $=s=>document.querySelector(s);
 /* Servidor de imágenes: fijo, no se puede cambiar desde la app */
 const SERVER_URL='https://fbm-622215956948-eu-west-1-an.s3.eu-west-1.amazonaws.com/juegos/Puzzlea/';
 const DPR=Math.min(window.devicePixelRatio||1,2.5);
+const NATIVE=!!(window.Capacitor&&window.Capacitor.isNativePlatform&&window.Capacitor.isNativePlatform());
 
-function toast(t){const e=$('#toast');e.textContent=t;e.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>e.style.display='none',2400)}
+function toast(t){const e=$('#toast');e.textContent=t;e.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>e.style.display='none',2600)}
 const loadImg=src=>new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=()=>rej(new Error('imagen no válida'));i.src=src});
 
-/* ---------- Almacén de imágenes (IndexedDB) ---------- */
+/* ---------- Almacén de imágenes descargadas/subidas (IndexedDB) ---------- */
 const DB={
   open(){return new Promise((res,rej)=>{const r=indexedDB.open('puzzles',1);
     r.onupgradeneeded=()=>r.result.createObjectStore('imgs',{keyPath:'id',autoIncrement:true});
     r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})},
-  async all(){const db=await this.open();return new Promise((res,rej)=>{const q=db.transaction('imgs').objectStore('imgs').getAll();q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)})},
-  async add(data,src){const db=await this.open();return new Promise((res,rej)=>{const q=db.transaction('imgs','readwrite').objectStore('imgs').add({data,src});q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)})},
-  async del(id){const db=await this.open();return new Promise((res,rej)=>{const q=db.transaction('imgs','readwrite').objectStore('imgs').delete(id);q.onsuccess=()=>res();q.onerror=()=>rej(q.error)})}
+  async run(mode,fn){const db=await this.open();return new Promise((res,rej)=>{const q=fn(db.transaction('imgs',mode).objectStore('imgs'));q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)})},
+  all(){return this.run('readonly',s=>s.getAll())},
+  add(data,src){return this.run('readwrite',s=>s.add({data,src}))},
+  clear(){return this.run('readwrite',s=>s.clear())}
 };
 
-/* ---------- Imágenes de ejemplo generadas ---------- */
-function makeSample(i){
-  const c=document.createElement('canvas');c.width=c.height=800;const g=c.getContext('2d');
-  const pal=[['#ff7b54','#ffb26b','#ffd56b','#939b62'],['#0f4c75','#3282b8','#bbe1fa','#1b262c'],['#6a0572','#ab83a1','#f6d6ff','#ff9a8b']][i];
-  const gr=g.createLinearGradient(0,0,800,800);gr.addColorStop(0,pal[0]);gr.addColorStop(1,pal[3]);g.fillStyle=gr;g.fillRect(0,0,800,800);
-  let s=i*977+13;const rnd=()=>(s=(s*16807)%2147483647)/2147483647;
-  for(let k=0;k<26;k++){g.globalAlpha=.55;g.fillStyle=pal[Math.floor(rnd()*4)];g.beginPath();
-    g.arc(rnd()*800,rnd()*800,30+rnd()*130,0,7);g.fill()}
-  g.globalAlpha=1;g.fillStyle=pal[2];g.beginPath();g.arc(600,200,70,0,7);g.fill();
-  g.fillStyle='rgba(0,0,0,.35)';g.beginPath();g.moveTo(0,800);g.lineTo(250,430);g.lineTo(450,650);g.lineTo(620,420);g.lineTo(800,800);g.fill();
-  g.fillStyle='#fff';g.font='bold 90px sans-serif';g.fillText(['A','B','C'][i],340,300);
-  return c.toDataURL('image/jpeg',.85);
-}
-
-/* ---------- Estado y ajustes ---------- */
+/* ---------- Estado y ajustes (se guardan de una vez para otra) ---------- */
 let images=[], selected=0, mode='jigsaw', N=3, sound=true;
+const save=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
 try{
   if(localStorage.getItem('mode')==='slide')mode='slide';
   const n=+localStorage.getItem('N');if(n>=2&&n<=6)N=n;
   sound=localStorage.getItem('sound')!=='0';
 }catch(e){}
 
+/* puzzles por defecto: los de la carpeta images/ del repositorio, empaquetados en la app */
+async function loadBuiltin(){
+  try{
+    const r=await fetch('images/manifest.json',{cache:'no-store'});
+    if(!r.ok)return [];
+    return (await r.json()).map(f=>({id:null,builtin:true,data:'images/'+encodeURIComponent(f)}));
+  }catch(e){return []}
+}
 async function loadImages(){
   let saved=[];try{saved=await DB.all()}catch(e){}
-  images=[0,1,2].map(i=>({id:null,data:makeSample(i)})).concat(saved);
+  images=(await loadBuiltin()).concat(saved);
   if(selected>=images.length)selected=0;
   renderGallery();
 }
 function renderGallery(){
   const g=$('#gallery');g.innerHTML='';
+  if(!images.length){const e=document.createElement('div');e.className='empty';e.textContent='🖼️';g.appendChild(e)}
   images.forEach((im,i)=>{
     const d=document.createElement('div');d.className='thumb'+(i===selected?' sel':'');
-    d.style.backgroundImage='url('+im.data+')';
+    d.style.backgroundImage='url("'+im.data+'")';
     d.onclick=()=>{selected=i;renderGallery()};
-    if(im.id!==null){const x=document.createElement('button');x.className='x';x.textContent='✕';
-      x.onclick=async e=>{e.stopPropagation();await DB.del(im.id);selected=0;loadImages()};d.appendChild(x)}
     g.appendChild(d);
   });
   const a=document.createElement('div');a.className='thumb add';a.textContent='+';
@@ -187,11 +176,35 @@ $('#file').onchange=async e=>{
   const files=[...e.target.files];e.target.value='';
   let ok=0;
   for(const f of files){try{await DB.add(await fileToSquare(f));ok++}catch(err){}}
-  if(ok){selected=images.length+ok-1;toast(ok+' imagen(es) añadida(s)')}else toast('No se pudo cargar la imagen');
-  await loadImages();
+  if(ok){await loadImages();selected=images.length-1;renderGallery();toast('✅ '+ok)}else toast('❌');
 };
 
 /* ---------- Descarga desde el servidor (bucket S3) ---------- */
+/* En la app (Android) se usa la red nativa, que no depende de CORS; en la web, fetch normal. */
+function b64Blob(b64,type){
+  const bin=atob(b64),u8=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++)u8[i]=bin.charCodeAt(i);
+  return new Blob([u8],{type});
+}
+async function httpGet(url,as){            /* as: 'text' | 'blob' */
+  const H=NATIVE&&window.Capacitor.Plugins&&window.Capacitor.Plugins.CapacitorHttp;
+  if(H){
+    let r;
+    try{r=await H.request({url,method:'GET',responseType:as==='blob'?'blob':'text',connectTimeout:15000,readTimeout:60000})}
+    catch(e){r=null}                       /* si falla el plugin, se prueba con fetch */
+    if(r){
+      if(r.status<200||r.status>=300)throw new Error('HTTP '+r.status);
+      if(as==='blob'){
+        const h=r.headers||{};
+        return b64Blob(r.data,h['Content-Type']||h['content-type']||'image/jpeg');
+      }
+      return typeof r.data==='string'?r.data:String(r.data);
+    }
+  }
+  const r=await fetch(url);
+  if(!r.ok)throw new Error('HTTP '+r.status);
+  return as==='blob'?r.blob():r.text();
+}
 const IMG_RE=/\.(jpe?g|png|webp|gif|bmp|avif)$/i;
 const keyUrl=(origin,key)=>origin+'/'+key.split('/').map(encodeURIComponent).join('/');
 async function listBucket(base){
@@ -203,9 +216,7 @@ async function listBucket(base){
     q.searchParams.set('list-type','2');
     q.searchParams.set('prefix',prefix);
     if(token)q.searchParams.set('continuation-token',token);
-    const r=await fetch(q);
-    if(!r.ok)throw new Error('El servidor respondió '+r.status+' al listar');
-    const x=new DOMParser().parseFromString(await r.text(),'application/xml');
+    const x=new DOMParser().parseFromString(await httpGet(q.toString(),'text'),'application/xml');
     for(const k of x.getElementsByTagName('Key'))keys.push(k.textContent);
     const trunc=x.getElementsByTagName('IsTruncated')[0];
     const next=x.getElementsByTagName('NextContinuationToken')[0];
@@ -213,48 +224,70 @@ async function listBucket(base){
   }while(token);
   return {origin:u.origin,keys:keys.filter(k=>IMG_RE.test(k))};
 }
+function netError(e){
+  const m=String(e&&e.message||e);
+  if(/HTTP 403/.test(m))return '🔒 403';
+  if(/HTTP 404/.test(m))return '❓ 404';
+  if(/HTTP \d+/.test(m))return '⚠️ '+m;
+  return '📡 ✖';
+}
 let downloading=false;
+/* Reemplaza TODOS los puzzles descargados/subidos por los del servidor.
+   Los puzzles por defecto (carpeta images/ del repo) no se tocan. */
 async function downloadAll(){
   if(downloading)return;
-  const btn=$('#cloudBtn');
-  downloading=true;btn.disabled=true;
+  const btn=$('#cloudBtn'),label='☁️ Descargar puzzles';
+  downloading=true;btn.disabled=true;btn.textContent='☁️ …';
   try{
-    toast('Consultando el servidor…');
     const {origin,keys}=await listBucket(SERVER_URL);
-    if(!keys.length){toast('No hay imágenes en el servidor');return}
-    const have=new Set(images.filter(i=>i.src).map(i=>i.src));
-    const todo=keys.filter(k=>!have.has(k));
-    if(!todo.length){toast('Ya tienes las '+keys.length+' imágenes');return}
-    let ok=0,fail=0;
-    for(let i=0;i<todo.length;i++){
-      btn.textContent='☁ '+(i+1)+' / '+todo.length;
+    if(!keys.length){toast('📭');return}            /* servidor vacío: no se borra nada */
+    const old=new Map((await DB.all()).filter(r=>r.src).map(r=>[r.src,r.data]));
+    const fresh=[];let fail=0;
+    for(let i=0;i<keys.length;i++){
+      btn.textContent='☁️ '+(i+1)+' / '+keys.length;
       try{
-        const r=await fetch(keyUrl(origin,todo[i]));
-        if(!r.ok)throw new Error('HTTP '+r.status);
-        await DB.add(await fileToSquare(await r.blob()),todo[i]);ok++;
-      }catch(e){fail++}
+        const blob=await httpGet(keyUrl(origin,keys[i]),'blob');
+        fresh.push({src:keys[i],data:await fileToSquare(blob)});
+      }catch(e){
+        fail++;
+        if(old.has(keys[i]))fresh.push({src:keys[i],data:old.get(keys[i])});   /* se conserva la copia anterior */
+      }
     }
-    toast(ok+' imagen(es) descargada(s)'+(fail?' · '+fail+' con error':''));
-    await loadImages();
+    await DB.clear();
+    for(const f of fresh)await DB.add(f.data,f.src);
+    selected=0;await loadImages();
+    toast(fail?('✅ '+(keys.length-fail)+'  ⚠️ '+fail):('✅ '+keys.length));
   }catch(e){
-    toast(e instanceof TypeError?'Sin conexión con el servidor':'Error: '+(e.message||e));
+    toast(netError(e));
   }finally{
-    downloading=false;btn.disabled=false;btn.textContent='☁ Descargar imágenes';
+    downloading=false;btn.disabled=false;btn.textContent=label;
   }
 }
 $('#cloudBtn').onclick=downloadAll;
 
-$('#editBtn').onclick=()=>{const h=$('#home');h.classList.toggle('edit');$('#editBtn').textContent=h.classList.contains('edit')?'Hecho':'Borrar imágenes'};
-
-function bindOpts(rowId,get,set){
-  const row=$(rowId);
-  const paint=()=>row.querySelectorAll('button').forEach(b=>b.classList.toggle('sel',b.dataset.v==String(get())));
-  row.querySelectorAll('button').forEach(b=>b.onclick=()=>{set(b.dataset.v);paint()});paint();
+/* ---------- Controles con iconos ---------- */
+function gridSvg(n,hole){
+  const s=24,g=2,cell=(s-g*(n+1))/n;let h='<svg viewBox="0 0 '+s+' '+s+'" width="30" height="30" fill="currentColor">';
+  for(let r=0;r<n;r++)for(let c=0;c<n;c++){
+    if(hole&&r===n-1&&c===n-1)continue;
+    h+='<rect x="'+(g+c*(cell+g))+'" y="'+(g+r*(cell+g))+'" width="'+cell+'" height="'+cell+'" rx="1.5"/>';
+  }
+  return h+'</svg>';
 }
-const save=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
-bindOpts('#modeRow',()=>mode,v=>{mode=v;save('mode',v)});
-bindOpts('#sizeRow',()=>N,v=>{N=+v;save('N',v)});
-bindOpts('#soundRow',()=>sound?1:0,v=>{sound=v==='1';save('sound',v)});
+function bindIcons(rowId,items,get,set){
+  const row=$(rowId);row.innerHTML='';
+  const paint=()=>row.querySelectorAll('button').forEach(b=>b.classList.toggle('sel',b.dataset.v==String(get())));
+  items.forEach(([v,html,label])=>{
+    const b=document.createElement('button');b.dataset.v=v;b.innerHTML=html;b.setAttribute('aria-label',label);
+    b.onclick=()=>{set(v);paint()};row.appendChild(b);
+  });
+  paint();
+}
+bindIcons('#modeRow',[['jigsaw','🧩','Rompecabezas'],['slide',gridSvg(3,true),'Deslizante']],()=>mode,v=>{mode=v;save('mode',v)});
+bindIcons('#sizeRow',[2,3,4,5,6].map(n=>[n,gridSvg(n,false),n+'x'+n]),()=>N,v=>{N=+v;save('N',v)});
+function paintSound(){$('#soundBtn').textContent=$('#soundBtn2').textContent=sound?'🔊':'🔇'}
+function toggleSound(){sound=!sound;save('sound',sound?'1':'0');paintSound();if(sound)popSound()}
+$('#soundBtn').onclick=$('#soundBtn2').onclick=toggleSound;
 
 /* ---------- Sonido y vibración ---------- */
 let AC=null;
@@ -268,8 +301,9 @@ function beep(freq,dur,type,vol,delay){
     o.connect(g);g.connect(AC.destination);o.start(t);o.stop(t+dur);
   }catch(e){}
 }
-const popSound=()=>{beep(660,.12,'triangle',.15,0);beep(990,.1,'triangle',.1,.06);try{navigator.vibrate&&navigator.vibrate(25)}catch(e){}};
-const fanfare=()=>[523,659,784,1047].forEach((f,i)=>beep(f,.3,'triangle',.16,i*.14));
+function popSound(){beep(660,.12,'triangle',.15,0);beep(990,.1,'triangle',.1,.06);if(sound){try{navigator.vibrate&&navigator.vibrate(25)}catch(e){}}}
+function fanfare(){[523,659,784,1047].forEach((f,i)=>beep(f,.3,'triangle',.16,i*.14))}
+paintSound();
 
 /* ---------- Geometría de las piezas ----------
    Cada borde interior tiene UNA sola curva (en coordenadas del tablero).
@@ -309,14 +343,19 @@ function piecePath(r,c,n,T,E,ox,oy){
 
 /* ---------- Juego ---------- */
 const board=$('#board'),stage=$('#stage'),hitCtx=document.createElement('canvas').getContext('2d');
-let S=0,T=0,PAD=0,P=0,L=null,curImg=null;
-let tiles=[],order=[],empty=-1,moves=0,t0=0,timer=null,done=false;
+let S=0,T=0,PAD=0,P=0,L=null,curImg=null,curUrl='';
+let tiles=[],order=[],empty=-1,done=false;
 let jig=null,drag=null,zTop=10;
 
 function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on',s.id===id))}
-function fmt(ms){const s=Math.floor(ms/1000);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')}
-function updateHud(){$('#moves').textContent=(mode==='jigsaw'&&jig)?('🧩 '+jig.placed.size+'/'+N*N):(moves+' mov.')}
+function setBar(f){$('#bar i').style.width=Math.round(f*100)+'%'}
 
+function squareCanvas(img){
+  const w=img.naturalWidth||img.width,h=img.naturalHeight||img.height,s=Math.min(w,h),out=Math.min(1024,s);
+  const c=document.createElement('canvas');c.width=c.height=out;
+  c.getContext('2d').drawImage(img,(w-s)/2,(h-s)/2,s,s,0,0,out,out);
+  return c;
+}
 function solveS(a,c){return Math.floor((-1+Math.sqrt(1+4*a*c))/(2*a))}
 function computeLayout(){
   const r=stage.getBoundingClientRect(),W=Math.floor(r.width),H=Math.floor(r.height);
@@ -357,7 +396,7 @@ function makePiece(r,c){
   g.restore();
   g.lineWidth=1.2;g.strokeStyle='rgba(0,0,0,.5)';g.stroke(path);          /* contorno */
   const id=r*N+c;
-  cv.dataset.id=id;
+  cv.dataset.id=id;cv.dataset.tx=L.bx+c*T-PAD;cv.dataset.ty=L.by+r*T-PAD;
   return {id,r,c,cv,path,x:0,y:0,z:0,placed:false,tx:L.bx+c*T-PAD,ty:L.by+r*T-PAD};
 }
 function scatter(list){
@@ -379,8 +418,8 @@ function buildJigsawView(){
   const gh=document.createElement('canvas');gh.id='ghost';
   gh.width=gh.height=Math.round(S*DPR);gh.style.width=gh.style.height=S+'px';
   const g=gh.getContext('2d');g.scale(DPR,DPR);
-  g.globalAlpha=.16;g.drawImage(curImg,0,0,S,S);g.globalAlpha=1;
-  g.strokeStyle='rgba(255,255,255,.22)';g.lineWidth=1.5;
+  g.globalAlpha=.2;g.drawImage(curImg,0,0,S,S);g.globalAlpha=1;
+  g.strokeStyle='rgba(255,255,255,.25)';g.lineWidth=1.5;
   for(let r=0;r<N;r++)for(let c=0;c<N;c++)g.stroke(piecePath(r,c,N,T,jig.E,0,0));
   board.insertBefore(gh,board.firstChild);
   jig.pieces=[];const loose=[];
@@ -390,7 +429,7 @@ function buildJigsawView(){
     else loose.push(p);
   }
   scatter(loose);
-  updateHud();
+  updateBar();
 }
 function pickPiece(x,y){
   let best=null;
@@ -428,16 +467,21 @@ function endDrag(snapCheck){
     p.cv.classList.add('snap');movePiece(p,p.tx,p.ty);
     p.placed=true;p.cv.classList.add('placed');p.cv.style.zIndex=1;
     setTimeout(()=>p.cv.classList.remove('snap'),160);
-    jig.placed.add(p.id);popSound();updateHud();
+    jig.placed.add(p.id);popSound();updateBar();
     if(jig.placed.size===N*N)finish();
   }
 }
 stage.addEventListener('pointerup',()=>endDrag(true));
 stage.addEventListener('pointercancel',()=>endDrag(false));
 function finish(){
-  done=true;clearInterval(timer);fanfare();
-  $('#winStats').textContent=fmt(Date.now()-t0);
+  done=true;fanfare();
   setTimeout(()=>$('#win').classList.add('on'),600);
+}
+function updateBar(){
+  if(mode==='jigsaw'&&jig)setBar(jig.placed.size/(N*N));
+  else if(mode==='slide'&&order.length){
+    let ok=0;order.forEach((v,i)=>{if(v===i&&v!==N*N-1)ok++});setBar(ok/(N*N-1));
+  }else setBar(0);
 }
 
 /* --- Deslizante --- */
@@ -448,7 +492,7 @@ function neighbors(p){
 function buildSlideView(){
   clearStage();
   L=computeLayout();S=L.S;T=S/N;applyBoard();
-  const img='url('+images[selected].data+')';tiles=[];
+  const img='url('+curUrl+')';tiles=[];
   for(let slot=0;slot<N*N;slot++){
     const piece=order[slot],el=document.createElement('div');el.className='tile';
     el.style.width=el.style.height=T+'px';
@@ -459,22 +503,17 @@ function buildSlideView(){
   }
   order.forEach((piece,slot)=>{const el=tiles[piece];
     el.style.left=(slot%N)*T+'px';el.style.top=Math.floor(slot/N)*T+'px'});
+  updateBar();
 }
 function slotAt(cx,cy){
   const r=board.getBoundingClientRect(),x=Math.floor((cx-r.left)/T),y=Math.floor((cy-r.top)/T);
   if(x<0||y<0||x>=N||y>=N)return -1;return y*N+x;
 }
 function afterSlideMove(){
-  moves++;updateHud();
   order.forEach((piece,slot)=>{const el=tiles[piece];
     el.style.left=(slot%N)*T+'px';el.style.top=Math.floor(slot/N)*T+'px'});
-  popSound();
-  if(order.every((v,i)=>v===i)){
-    tiles[N*N-1].classList.remove('empty');
-    done=true;clearInterval(timer);fanfare();
-    $('#winStats').textContent=moves+' movimientos · '+fmt(Date.now()-t0);
-    setTimeout(()=>$('#win').classList.add('on'),450);
-  }
+  popSound();updateBar();
+  if(order.every((v,i)=>v===i)){tiles[N*N-1].classList.remove('empty');finish()}
 }
 board.addEventListener('pointerdown',e=>{
   if(mode!=='slide'||done)return;
@@ -487,9 +526,9 @@ board.addEventListener('pointerdown',e=>{
 /* --- Arranque / reinicio --- */
 function newShuffle(){
   if(!curImg)return;
-  done=false;moves=0;drag=null;jig=null;$('#win').classList.remove('on');
-  clearInterval(timer);
+  done=false;drag=null;jig=null;$('#win').classList.remove('on');
   if(mode==='jigsaw'){
+    order=[];
     jig={E:newEdges(N),placed:new Set(),pieces:[]};
     buildJigsawView();
   }else{
@@ -499,17 +538,18 @@ function newShuffle(){
       order[empty]=order[m];order[m]=n-1;last=empty;empty=m;
     }
     if(order.every((v,i)=>v===i))return newShuffle();
-    buildSlideView();updateHud();
+    buildSlideView();
   }
-  t0=Date.now();$('#time').textContent='0:00';
-  timer=setInterval(()=>{$('#time').textContent=fmt(Date.now()-t0)},500);
 }
 async function startGame(){
+  if(!images.length){toast('☁️ ⬇');return}
   show('game');$('#win').classList.remove('on');
   await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
-  try{curImg=await loadImg(images[selected].data)}
-  catch(e){toast('No se pudo cargar la imagen');show('home');return}
-  $('#preview').style.backgroundImage='url('+images[selected].data+')';
+  try{
+    curImg=squareCanvas(await loadImg(images[selected].data));
+    curUrl=curImg.toDataURL('image/jpeg',.9);
+  }catch(e){toast('❌');show('home');return}
+  $('#preview').style.backgroundImage='url('+curUrl+')';
   newShuffle();
 }
 let rz;
@@ -518,7 +558,7 @@ window.addEventListener('resize',()=>{
   rz=setTimeout(()=>{
     if(!$('#game').classList.contains('on')||!curImg)return;
     drag=null;
-    if(mode==='jigsaw'&&jig)buildJigsawView();else if(mode==='slide')buildSlideView();
+    if(mode==='jigsaw'&&jig)buildJigsawView();else if(mode==='slide'&&order.length)buildSlideView();
   },250);
 });
 
@@ -526,8 +566,8 @@ window.addEventListener('resize',()=>{
 $('#playBtn').onclick=startGame;
 $('#shuffleBtn').onclick=newShuffle;
 $('#againBtn').onclick=newShuffle;
-$('#menuBtn').onclick=()=>{clearInterval(timer);show('home')};
-$('#backBtn').onclick=()=>{clearInterval(timer);show('home')};
+$('#menuBtn').onclick=()=>show('home');
+$('#backBtn').onclick=()=>show('home');
 const pv=$('#preview'),peek=$('#peekBtn');
 const on=()=>pv.style.display='block',off=()=>pv.style.display='none';
 peek.addEventListener('pointerdown',on);peek.addEventListener('pointerup',off);
@@ -537,7 +577,7 @@ peek.addEventListener('pointerleave',off);peek.addEventListener('pointercancel',
 try{
   const A=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.App;
   if(A)A.addListener('backButton',()=>{
-    if($('#game').classList.contains('on')){clearInterval(timer);show('home')}else A.exitApp();
+    if($('#game').classList.contains('on'))show('home');else A.exitApp();
   });
 }catch(e){}
 
