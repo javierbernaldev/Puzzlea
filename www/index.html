@@ -53,12 +53,17 @@ button:disabled{opacity:.6}
 #win{position:absolute;inset:0;background:rgba(10,12,30,.9);display:none;flex-direction:column;align-items:center;justify-content:center;gap:22px;z-index:20}
 #win.on{display:flex}
 #win .big{font-size:96px;line-height:1;animation:pop .6s ease-out}
-#win .stars{font-size:44px;letter-spacing:6px}
 #win .row{display:flex;gap:22px}
 #win .ib{width:76px;height:76px;font-size:38px}
 #win .go{background:var(--ok);color:#0b3d1f}
 @keyframes pop{0%{transform:scale(.3) rotate(-20deg);opacity:0}70%{transform:scale(1.2) rotate(6deg)}100%{transform:scale(1);opacity:1}}
 #toast{pointer-events:none;max-width:86vw;text-align:center;position:fixed;left:50%;top:76px;transform:translateX(-50%);background:#000d;padding:10px 16px;border-radius:20px;display:none;z-index:99;font-size:15px}
+#gallery.del .thumb:not(.add){animation:wob .5s infinite alternate}
+#gallery.del .add{opacity:.3;pointer-events:none}
+.thumb .x{position:absolute;right:-6px;top:-6px;width:40px;height:40px;border-radius:50%;background:#e5484d;color:#fff;font-size:20px;padding:0;display:grid;place-items:center;box-shadow:0 2px 6px #0008}
+.thumb .lock{position:absolute;right:6px;top:6px;font-size:20px;opacity:.7}
+#delBtn.on{background:var(--ok);color:#0b3d1f}
+@keyframes wob{from{transform:rotate(-1.2deg)}to{transform:rotate(1.2deg)}}
 #pin{position:fixed;inset:0;background:#000c;display:none;align-items:center;justify-content:center;z-index:90}
 #pin.on{display:flex}
 #pin .box{background:var(--card);border-radius:24px;padding:20px;display:flex;flex-direction:column;align-items:center;gap:14px}
@@ -76,6 +81,7 @@ button:disabled{opacity:.6}
 <div id="home" class="screen on">
   <div class="top">
     <h1>🧩 Puzzlea</h1>
+    <button id="delBtn" class="ib" aria-label="Borrar fotos">🗑️</button>
     <button id="soundBtn" class="ib" aria-label="Sonido">🔊</button>
   </div>
   <div id="gallery"></div>
@@ -108,7 +114,6 @@ button:disabled{opacity:.6}
   <div id="stage"><div id="board"><div id="preview"></div></div></div>
   <div id="win">
     <div class="big">🎉</div>
-    <div class="stars">⭐⭐⭐</div>
     <div class="row">
       <button id="againBtn" class="ib go" aria-label="Otra vez">↻</button>
       <button id="menuBtn" class="ib" aria-label="Inicio">🏠</button>
@@ -136,10 +141,12 @@ const DB={
   async run(mode,fn){const db=await this.open();return new Promise((res,rej)=>{const q=fn(db.transaction('imgs',mode).objectStore('imgs'));q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)})},
   all(){return this.run('readonly',s=>s.getAll())},
   add(data,src){return this.run('readwrite',s=>s.add({data,src}))},
+  del(id){return this.run('readwrite',s=>s.delete(id))},
   clear(){return this.run('readwrite',s=>s.clear())}
 };
 
 /* ---------- Estado y ajustes (se guardan de una vez para otra) ---------- */
+let delMode=false;
 let images=[], selected=0, mode='jigsaw', N=3, sound=true;
 const save=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
 try{
@@ -163,23 +170,30 @@ async function loadImages(){
   renderGallery();
 }
 function renderGallery(){
-  const g=$('#gallery');g.innerHTML='';
+  const g=$('#gallery');g.innerHTML='';g.classList.toggle('del',delMode);
   if(!images.length){const e=document.createElement('div');e.className='empty';e.textContent='🖼️';g.appendChild(e)}
   images.forEach((im,i)=>{
     const d=document.createElement('div');d.className='thumb'+(i===selected?' sel':'');
     d.style.backgroundImage='url("'+im.data+'")';
-    d.onclick=()=>{selected=i;renderGallery()};
+    if(delMode){
+      if(im.builtin){const l=document.createElement('span');l.className='lock';l.textContent='🔒';d.appendChild(l)}
+      else{const x=document.createElement('button');x.className='x';x.textContent='✖';x.setAttribute('aria-label','Borrar');
+        x.onclick=async e=>{e.stopPropagation();try{await DB.del(im.id)}catch(err){toast('❌');return}
+          if(selected>i)selected--;await loadImages();renderGallery()};
+        d.appendChild(x)}
+    }else d.onclick=()=>{selected=i;renderGallery()};
     g.appendChild(d);
   });
   const a=document.createElement('div');a.className='thumb add';a.textContent='+';
-  a.onclick=askPin;g.appendChild(a);
+  a.onclick=()=>askPin(()=>$('#file').click());g.appendChild(a);
 }
 
 /* Añadir fotos pide una clave (para que los niños no las cambien) */
 const PIN='2202';
 let pinVal='';
 function pinDots(){document.querySelectorAll('#pin .dots i').forEach((d,i)=>d.classList.toggle('f',i<pinVal.length))}
-function askPin(){pinVal='';pinDots();$('#pin').classList.add('on')}
+let pinCb=null;
+function askPin(cb){pinCb=cb;pinVal='';pinDots();$('#pin').classList.add('on')}
 document.querySelectorAll('#pin .keys button').forEach(b=>b.onclick=()=>{
   const k=b.dataset.k;
   if(k==='x'){$('#pin').classList.remove('on');return}
@@ -187,10 +201,16 @@ document.querySelectorAll('#pin .keys button').forEach(b=>b.onclick=()=>{
   if(pinVal.length>=4)return;
   pinVal+=b.textContent;pinDots();
   if(pinVal.length===4){
-    if(pinVal===PIN){$('#pin').classList.remove('on');pinVal='';$('#file').click()}
+    if(pinVal===PIN){$('#pin').classList.remove('on');pinVal='';const cb=pinCb;pinCb=null;if(cb)cb()}
     else{const p=$('#pin');p.classList.add('bad');setTimeout(()=>{p.classList.remove('bad');pinVal='';pinDots()},400)}
   }
 });
+
+/* Modo borrar: botón 🗑️ (con clave). Solo se borran las fotos añadidas; las del repo (🔒) no. */
+function setDelMode(on){
+  delMode=on;const b=$('#delBtn');b.classList.toggle('on',on);b.textContent=on?'✔':'🗑️';renderGallery();
+}
+$('#delBtn').onclick=()=>{if(delMode)setDelMode(false);else askPin(()=>setDelMode(true))};
 
 /* recorta al cuadrado y reduce a 1024 */
 function fileToSquare(file){
@@ -427,7 +447,7 @@ stage.addEventListener('pointerup',()=>endDrag(true));
 stage.addEventListener('pointercancel',()=>endDrag(false));
 function finish(){
   done=true;fanfare();
-  setTimeout(()=>$('#win').classList.add('on'),600);
+  setTimeout(()=>$('#win').classList.add('on'),2200);   /* deja ver el puzzle terminado antes del 🎉 */
 }
 function updateBar(){
   if(mode==='jigsaw'&&jig)setBar(jig.placed.size/(N*N));
@@ -501,6 +521,7 @@ function newShuffle(){
 }
 async function startGame(){
   if(!images.length){toast('🖼️');return}
+  if(delMode)setDelMode(false);
   show('game');$('#win').classList.remove('on');
   await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
   try{
