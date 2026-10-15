@@ -23,6 +23,11 @@ jobs:
       - name: Instalar dependencias
         run: npm install
 
+      - name: Preparar imágenes por defecto (repo images_default/)
+        run: |
+          node scripts/prepare-images.mjs
+          ls -l www/images
+
       - name: Crear proyecto Android y sincronizar
         run: |
           npx cap add android
@@ -65,9 +70,17 @@ jobs:
           echo "--- datos del paquete ---"
           "$BT/aapt2" dump badging dist/Puzzlea.apk | grep -E "^package:|sdkVersion|targetSdkVersion|native-code|application-label:" || true
 
+      - name: Compilar APK debug (prueba de instalacion)
+        working-directory: android
+        run: |
+          ./gradlew assembleDebug --no-daemon
+          mkdir -p ../dist
+          cp app/build/outputs/apk/debug/app-debug.apk ../dist/Puzzlea-debug.apk
+          ls -l ../dist
+
       - name: Subir APK
         uses: actions/upload-artifact@v4
         with:
           name: puzzlea-apk
-          path: dist/Puzzlea.apk
+          path: dist/*.apk
           retention-days: 90
