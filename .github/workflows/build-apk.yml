@@ -28,12 +28,38 @@ jobs:
       - name: Compilar APK
         run: ./gradlew assembleRelease --no-daemon
 
-      - name: Renombrar APK
+      - name: Firmar APK
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          mkdir -p dist
+          set -euo pipefail
+
           APK=$(find app/build/outputs/apk/release -name "*.apk" | head -1)
           test -n "$APK" || { echo "No se ha encontrado el APK"; exit 1; }
-          cp "$APK" dist/Puzzlea.apk
+          echo "APK generado: $APK"
+
+          BUILD_TOOLS=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          echo "Usando build-tools: $BUILD_TOOLS"
+
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+
+          mkdir -p dist
+          "$BUILD_TOOLS/zipalign" -p -f 4 "$APK" "$RUNNER_TEMP/aligned.apk"
+
+          "$BUILD_TOOLS/apksigner" sign \
+            --ks "$RUNNER_TEMP/release.jks" \
+            --ks-pass env:KEYSTORE_PASSWORD \
+            --ks-key-alias "$KEY_ALIAS" \
+            --key-pass env:KEY_PASSWORD \
+            --out dist/Puzzlea.apk \
+            "$RUNNER_TEMP/aligned.apk"
+
+          "$BUILD_TOOLS/apksigner" verify --verbose dist/Puzzlea.apk
+
+          rm -f "$RUNNER_TEMP/release.jks"
           ls -lh dist/
 
       - name: Subir artefacto
