@@ -222,7 +222,8 @@ async function listBucket(base){
     const next=x.getElementsByTagName('NextContinuationToken')[0];
     token=(trunc&&trunc.textContent==='true'&&next)?next.textContent:'';
   }while(token);
-  return {origin:u.origin,keys:keys.filter(k=>IMG_RE.test(k))};
+  /* images_default/ son los puzzles por defecto (ya van dentro de la app): no se descargan como puzzles */
+  return {origin:u.origin,keys:keys.filter(k=>IMG_RE.test(k)&&!k.startsWith(prefix+'images_default/'))};
 }
 function netError(e){
   const m=String(e&&e.message||e);
