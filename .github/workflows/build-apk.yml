@@ -55,6 +55,16 @@ jobs:
           mkdir -p dist && cp "$RUNNER_TEMP/Puzzlea.apk" dist/Puzzlea.apk
           rm -f "$RUNNER_TEMP/release.jks"
 
+      - name: Diagnostico del APK
+        run: |
+          BT="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
+          ls -l dist/Puzzlea.apk
+          sha256sum dist/Puzzlea.apk
+          echo "--- esquemas de firma ---"
+          "$BT/apksigner" verify -v dist/Puzzlea.apk | grep -i -E "^Verif|Number of signers|WARNING|ERROR" || true
+          echo "--- datos del paquete ---"
+          "$BT/aapt2" dump badging dist/Puzzlea.apk | grep -E "^package:|sdkVersion|targetSdkVersion|native-code|application-label:" || true
+
       - name: Subir APK
         uses: actions/upload-artifact@v4
         with:
