@@ -15,7 +15,7 @@ jobs:
         with:
           node-version: 22
 
-      - name: Preparar imágenes por defecto (carpeta images/)
+      - name: Preparar imágenes por defecto (images_default/)
         run: node scripts/prepare-images.mjs
 
       - name: Subir web
