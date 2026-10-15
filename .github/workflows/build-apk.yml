@@ -35,6 +35,6 @@ jobs:
       - name: Subir APK
         uses: actions/upload-artifact@v4
         with:
-          name: puzzlea-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: puzzlea-apk-game
+          path: android/app/build/outputs/apk/debug/Puzzlea.apk
           retention-days: 90
