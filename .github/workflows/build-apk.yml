@@ -33,6 +33,11 @@ jobs:
           npx cap add android
           npx cap sync android
 
+      - name: Icono de la app (puzzle)
+        run: |
+          python3 -c 'import PIL' 2>/dev/null || pip install --break-system-packages pillow
+          python3 scripts/make-icons.py android/app/src/main/res
+
       - name: Compilar APK release (sin firmar)
         working-directory: android
         run: ./gradlew assembleRelease --no-daemon
