@@ -8,25 +8,11 @@ Juego de puzzles para niños. Web (HTML/JS) empaquetada como APK con Capacitor y
 
 ## Puzzles
 
-1. **Por defecto:** las imágenes de la carpeta `images/` del repo (cuadradas, ~1024 px). Van dentro del APK y de la web.
-   Al hacer push se vuelve a compilar todo con las que haya.
-2. **Del servidor:** botón **☁️ Descargar puzzles**. Borra todos los puzzles que no sean los por defecto
-   (también los subidos con `+`) y baja los del bucket S3:
-   `https://fbm-622215956948-eu-west-1-an.s3.eu-west-1.amazonaws.com/juegos/Puzzlea/`
-   (esa URL está fija en la app). Si el servidor está vacío o no responde, no se borra nada.
+1. **Por defecto:** las imágenes de la carpeta `images_default/` del repo (cuadradas). Se empaquetan en el APK y en la web al compilar;
+   tras añadir o quitar imágenes, vuelve a lanzar Build APK / Build web. Sin imágenes el build falla (`ALLOW_EMPTY=1` lo permite).
+2. **Propios:** botón `+` de la pantalla de inicio (se guardan en el dispositivo).
 
-## Configurar el bucket (una vez)
-
-`server/configure-s3.sh` (AWS CLI con permisos de S3) añade a la política del bucket lectura y listado públicos
-**solo** de `juegos/Puzzlea/` y una regla CORS, sin tocar lo que ya tengas:
-
-    ./server/configure-s3.sh
-    # si el bucket bloquea políticas públicas:
-    ALLOW_PUBLIC_POLICY=1 ./server/configure-s3.sh
-
-Subir puzzles: `aws s3 sync ./imagenes s3://fbm-622215956948-eu-west-1-an/juegos/Puzzlea/`
-
-El prefijo es público: no subas fotos privadas.
+La app no descarga nada de ningún servidor.
 
 ## APK (GitHub Actions, gratis)
 
@@ -34,14 +20,19 @@ Workflow **Build APK** (en cada push a `main` o con *Run workflow*). Necesita lo
 `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS` y `KEY_PASSWORD`.
 Descarga el artefacto **puzzlea-apk**: `Puzzlea.apk` (release firmado) y `Puzzlea-debug.apk` (prueba).
 
-## Web
+## Web (S3)
 
-Workflow **Deploy web** publica `www/` en GitHub Pages. Una sola vez: *Settings → Pages → Source: GitHub Actions*
-(en repos privados necesita un plan de pago; si no, ver más abajo). La URL aparece en la ejecución del workflow.
+El workflow **Build web** deja la web lista como artefacto **puzzlea-web** (`www/` con las imágenes por defecto dentro).
+Para publicarla en S3, desde un equipo con AWS CLI:
+
+    ./server/deploy-web.sh                      # s3://fbm-622215956948-eu-west-1-an/juegos/Puzzlea-web/
+    ./server/deploy-web.sh s3://bucket/prefijo  # otro destino
+
+- El destino **no** puede estar dentro de `juegos/Puzzlea/` (ese prefijo es el de los puzzles del servidor;
+  la app lista todo lo que hay en él y las imágenes de la web saldrían duplicadas). El script lo comprueba.
+- Con CloudFront delante: origen = ese prefijo (Origin path `/juegos/Puzzlea-web`) y *Default root object* = `index.html`.
 
 Probar en local:
 
     node scripts/prepare-images.mjs
     python3 -m http.server 8080 -d www
-
-Alternativa a Pages: subir el contenido de `www/` (tras `prepare-images.mjs`) a S3 + CloudFront o a nginx.
