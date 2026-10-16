@@ -23,7 +23,9 @@ button:disabled{opacity:.6}
 /* inicio */
 .top{display:flex;align-items:center;gap:10px}
 .top h1{margin:0;font-size:22px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.top{gap:6px}
 .top .ib{width:44px;height:44px;font-size:21px}
+@media(max-width:430px){.top h1 .nm{display:none}}
 #gallery{flex:1;min-height:0;overflow:auto;display:grid;grid-template-columns:repeat(2,1fr);gap:12px;align-content:start;padding:2px}
 @media(min-width:560px){#gallery{grid-template-columns:repeat(3,1fr)}}
 @media(min-width:900px){#gallery{grid-template-columns:repeat(5,1fr)}}
@@ -88,7 +90,8 @@ button:disabled{opacity:.6}
 
 <div id="home" class="screen on">
   <div class="top">
-    <h1>🧩 Puzzlea</h1>
+    <h1>🧩<span class="nm"> Puzzlea</span></h1>
+    <button id="syncBtn" class="ib" aria-label="Descargar">⬇️</button>
     <button id="addBtn" class="ib" aria-label="Añadir foto">➕</button>
     <button id="ordBtn" class="ib" aria-label="Ordenar">↔️</button>
     <button id="delBtn" class="ib" aria-label="Borrar fotos">🗑️</button>
@@ -142,6 +145,12 @@ const $=s=>document.querySelector(s);
 const DPR=Math.min(window.devicePixelRatio||1,2.5);
 const NATIVE=!!(window.Capacitor&&window.Capacitor.isNativePlatform&&window.Capacitor.isNativePlatform());
 
+/* ---------- Servidor de puzzles (S3) · ver server/README-S3.md ---------- */
+const BUCKET_URL='https://fbm-622215956948-eu-west-1-an.s3.eu-west-1.amazonaws.com/';
+const WAREHOUSE='juegos/Puzzlea/images_warehouse/';      /* carpeta con listado público (la única) */
+const UPLOAD_URL='https://geqskc34bnqvjw5abnk7mqbnmu0ykdfy.lambda-url.eu-west-1.on.aws/';                                      /* ← pega aquí la Function URL de la Lambda (vacío = ➕ guarda solo en el dispositivo) */
+const UPLOAD_KEY='3_U28kTeCYHnBuTH3b6dxOMr';                  /* clave larga: la misma que la variable UPLOAD_SECRET de la Lambda */
+
 function toast(t){const e=$('#toast');e.textContent=t;e.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>e.style.display='none',2600)}
 const loadImg=src=>new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=()=>rej(new Error('imagen no válida'));i.src=src});
 
@@ -152,7 +161,7 @@ const DB={
     r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})},
   async run(mode,fn){const db=await this.open();return new Promise((res,rej)=>{const q=fn(db.transaction('imgs',mode).objectStore('imgs'));q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)})},
   all(){return this.run('readonly',s=>s.getAll())},
-  add(data,src){return this.run('readwrite',s=>s.add({data,src}))},
+  add(data,src,etag){return this.run('readwrite',s=>s.add({data,src,etag}))},
   del(id){return this.run('readwrite',s=>s.delete(id))},
   clear(){return this.run('readwrite',s=>s.clear())}
 };
@@ -198,7 +207,7 @@ function renderGallery(){
     if(galMode==='del'){
       if(im.builtin){const l=document.createElement('span');l.className='lock';l.textContent='🔒';d.appendChild(l)}
       else{const x=document.createElement('button');x.className='x';x.textContent='✖';x.setAttribute('aria-label','Borrar');
-        x.onclick=async e=>{e.stopPropagation();try{await DB.del(im.id)}catch(err){toast('❌');return}
+        x.onclick=async e=>{e.stopPropagation();try{await DB.del(im.id);if(im.src)hideKey(im.src)}catch(err){toast('❌');return}
           await loadImages()};
         d.appendChild(x)}
     }else if(galMode==='ord'){
@@ -260,10 +269,114 @@ function fileToSquare(file){
 }
 $('#file').onchange=async e=>{
   const files=[...e.target.files];e.target.value='';
-  let ok=0;
-  for(const f of files){try{await DB.add(await fileToSquare(f));ok++}catch(err){}}
-  if(ok){await loadImages();selected=images.length-1;renderGallery();toast('✅ '+ok)}else toast('❌');
+  let ok=0,fail=0;
+  if(UPLOAD_URL){                                  /* sube a S3 (carpeta images_warehouse) y luego sincroniza */
+    const b=$('#addBtn');b.disabled=true;b.textContent='⏳';
+    for(const f of files){
+      try{await uploadOne(await fileToSquare(f),f.name.replace(/\.[^.]*$/,'')+'.jpg');ok++}catch(err){fail++}
+    }
+    b.disabled=false;b.textContent='➕';
+    if(ok)await syncWarehouse(true);
+    toast(ok?(fail?'⬆ '+ok+'  ⚠️ '+fail:'⬆ '+ok):'❌');
+  }else{                                           /* sin servidor: se guarda solo en este dispositivo */
+    for(const f of files){try{await DB.add(await fileToSquare(f));ok++}catch(err){}}
+    if(ok){await loadImages();selected=images.length-1;renderGallery();toast('✅ '+ok)}else toast('❌');
+  }
 };
+
+/* ---------- Subir y descargar puzzles (S3) ---------- */
+const keyUrl=k=>BUCKET_URL+k.split('/').map(encodeURIComponent).join('/');
+const IMG_RE=/\.(jpe?g|png|webp|gif|bmp|avif)$/i;
+function b64Blob(b64,type){
+  const bin=atob(b64),u8=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++)u8[i]=bin.charCodeAt(i);
+  return new Blob([u8],{type});
+}
+async function httpGet(url,as){            /* as: 'text' | 'blob'. En la app (Android) usa la red nativa. */
+  const H=NATIVE&&window.Capacitor.Plugins&&window.Capacitor.Plugins.CapacitorHttp;
+  if(H){
+    let r;
+    try{r=await H.request({url,method:'GET',responseType:as==='blob'?'blob':'text',connectTimeout:15000,readTimeout:60000})}
+    catch(e){r=null}
+    if(r){
+      if(r.status<200||r.status>=300)throw new Error('HTTP '+r.status);
+      if(as==='blob'){const h=r.headers||{};return b64Blob(r.data,h['Content-Type']||h['content-type']||'image/jpeg')}
+      return typeof r.data==='string'?r.data:String(r.data);
+    }
+  }
+  const r=await fetch(url);
+  if(!r.ok)throw new Error('HTTP '+r.status);
+  return as==='blob'?r.blob():r.text();
+}
+function netError(e){
+  const m=String(e&&e.message||e);
+  if(/HTTP 403/.test(m))return '🔒 403';
+  if(/HTTP 404/.test(m))return '❓ 404';
+  if(/HTTP \d+/.test(m))return '⚠️ '+m;
+  return '📡 ✖';
+}
+/* Fotos descargadas que se borraron a mano en este dispositivo: no se vuelven a bajar */
+const getHidden=()=>{try{return JSON.parse(localStorage.getItem('hidden')||'[]')}catch(e){return[]}};
+const hideKey=k=>{const h=getHidden();if(!h.includes(k)){h.push(k);save('hidden',JSON.stringify(h))}};
+
+async function listWarehouse(){
+  const out=[];let token='';
+  do{
+    const q=new URL(BUCKET_URL);
+    q.searchParams.set('list-type','2');q.searchParams.set('prefix',WAREHOUSE);
+    if(token)q.searchParams.set('continuation-token',token);
+    const x=new DOMParser().parseFromString(await httpGet(q.toString(),'text'),'application/xml');
+    for(const c of x.getElementsByTagName('Contents')){
+      const key=c.getElementsByTagName('Key')[0].textContent;
+      const et=c.getElementsByTagName('ETag')[0];
+      if(IMG_RE.test(key))out.push({key,etag:et?et.textContent:''});
+    }
+    const tr=x.getElementsByTagName('IsTruncated')[0],nx=x.getElementsByTagName('NextContinuationToken')[0];
+    token=(tr&&tr.textContent==='true'&&nx)?nx.textContent:'';
+  }while(token);
+  return out;
+}
+/* Deja los puzzles descargados igual que la carpeta de S3: baja los nuevos o cambiados y quita los que ya no están.
+   Las fotos propias (➕ sin servidor) y las del repo no se tocan. */
+let syncing=false;
+async function syncWarehouse(quiet){
+  if(syncing)return;
+  syncing=true;const btn=$('#syncBtn');btn.disabled=true;btn.textContent='⏳';
+  try{
+    const items=await listWarehouse();
+    const hidden=new Set(getHidden());
+    const want=items.filter(i=>!hidden.has(i.key));
+    const wantKeys=new Set(want.map(i=>i.key));
+    const rows=(await DB.all()).filter(r=>r.src);
+    const have=new Map(rows.map(r=>[r.src,r]));
+    for(const r of rows)if(!wantKeys.has(r.src))await DB.del(r.id);
+    let added=0,fail=0;
+    for(const it of want){
+      const cur=have.get(it.key);
+      if(cur&&cur.etag===it.etag)continue;
+      try{
+        const data=await fileToSquare(await httpGet(keyUrl(it.key),'blob'));
+        if(cur)await DB.del(cur.id);
+        await DB.add(data,it.key,it.etag);added++;
+      }catch(e){fail++}
+    }
+    await loadImages();
+    if(!quiet)toast(fail?('⬇ '+added+'  ⚠️ '+fail):(added?'⬇ '+added:'✅'));
+  }catch(e){
+    if(!quiet)toast(netError(e)); else throw e;
+  }finally{syncing=false;btn.disabled=false;btn.textContent='⬇️'}
+}
+async function uploadOne(dataUrl,name){
+  /* 1) la Lambda comprueba la clave y devuelve un permiso de subida firmado; 2) la foto va directa a S3 */
+  const r=await fetch(UPLOAD_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({key:UPLOAD_KEY,name,type:'image/jpeg'})});
+  if(!r.ok)throw new Error('HTTP '+r.status);
+  const p=await r.json();
+  const fd=new FormData();Object.entries(p.fields).forEach(([k,v])=>fd.append(k,v));
+  fd.append('file',await (await fetch(dataUrl)).blob());          /* el fichero va siempre el último */
+  const u=await fetch(p.url,{method:'POST',body:fd});
+  if(!u.ok)throw new Error('HTTP '+u.status);
+}
+$('#syncBtn').onclick=()=>askPin(()=>syncWarehouse(false));
 
 
 
