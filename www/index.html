@@ -29,7 +29,7 @@ button:disabled{opacity:.6}
 #gallery{flex:1;min-height:0;overflow:auto;display:grid;grid-template-columns:repeat(2,1fr);gap:12px;align-content:start;padding:2px}
 @media(min-width:560px){#gallery{grid-template-columns:repeat(3,1fr)}}
 @media(min-width:900px){#gallery{grid-template-columns:repeat(5,1fr)}}
-.thumb{position:relative;aspect-ratio:1;border-radius:18px;background:var(--card) center/cover;border:4px solid transparent}
+.thumb{position:relative;aspect-ratio:1;border-radius:18px;background:var(--card) center/cover no-repeat;background-origin:border-box;border:4px solid transparent}
 .thumb.sel{border-color:var(--acc);box-shadow:0 0 0 3px #ffb70055}
 .thumb.sel::after{content:"✓";position:absolute;right:8px;bottom:8px;width:32px;height:32px;border-radius:50%;background:var(--acc);color:#1b1f3b;display:grid;place-items:center;font-weight:900}
 .add{display:grid;place-items:center;font-size:44px;color:var(--mute);border:3px dashed var(--mute);background:transparent}
@@ -72,15 +72,23 @@ button:disabled{opacity:.6}
 .thumb .n{position:absolute;left:6px;top:6px;min-width:26px;height:26px;border-radius:13px;background:#000a;color:#fff;font-weight:800;font-size:14px;display:grid;place-items:center;padding:0 6px}
 .thumb .x{position:absolute;right:-6px;top:-6px;width:40px;height:40px;border-radius:50%;background:#e5484d;color:#fff;font-size:20px;padding:0;display:grid;place-items:center;box-shadow:0 2px 6px #0008}
 .thumb .lock{position:absolute;right:6px;top:6px;font-size:20px;opacity:.7}
+#tools{display:none;justify-content:center;gap:14px;background:var(--card);border-radius:20px;padding:8px}
+#tools.on{display:flex}
+#homeBtn{display:none;align-self:center;width:96px;height:56px;border-radius:28px;font-size:30px;background:var(--card2);margin-top:auto}
+#home.tmode .bottom,#home.tmode #toolBtn{display:none}
+#home.tmode #homeBtn{display:grid}
+#tools .ib{width:56px;height:56px;font-size:26px;background:var(--card2)}
 #delBtn.on,#ordBtn.on{background:var(--ok);color:#0b3d1f}
 @keyframes wob{from{transform:rotate(-1.2deg)}to{transform:rotate(1.2deg)}}
 #pin{position:fixed;inset:0;background:#000c;display:none;align-items:center;justify-content:center;z-index:90}
 #pin.on{display:flex}
-#pin .box{background:var(--card);border-radius:24px;padding:20px;display:flex;flex-direction:column;align-items:center;gap:14px}
-#pin .dots{display:flex;gap:14px;height:22px}
+#pin .box{position:relative;background:var(--card);border-radius:24px;padding:20px;display:flex;flex-direction:column;align-items:center;gap:14px}
+#pin .dots{display:flex;gap:12px;height:22px}
 #pin .dots i{width:20px;height:20px;border-radius:50%;border:3px solid var(--mute)}
 #pin .dots i.f{background:var(--acc);border-color:var(--acc)}
 #pin .keys{display:grid;grid-template-columns:repeat(3,64px);gap:10px}
+#pin #pinX{position:absolute;right:-12px;top:-12px;width:44px;height:44px;border-radius:50%;background:#e5484d;color:#fff;font-size:20px;padding:0;display:grid;place-items:center;box-shadow:0 3px 8px #0009}
+#pin.busy .box{opacity:.6;pointer-events:none}
 #pin .keys button{height:64px;font-size:26px;background:#ffffff18;padding:0}
 #pin.bad .box{animation:shake .35s}
 @keyframes shake{25%{transform:translateX(-12px)}75%{transform:translateX(12px)}}
@@ -91,11 +99,14 @@ button:disabled{opacity:.6}
 <div id="home" class="screen on">
   <div class="top">
     <h1>🧩<span class="nm"> Puzzlea</span></h1>
+    <button id="toolBtn" class="ib" aria-label="Herramientas">🔧</button>
+    <button id="soundBtn" class="ib" aria-label="Sonido">🔊</button>
+  </div>
+  <div id="tools" class="tools">
     <button id="syncBtn" class="ib" aria-label="Descargar">⬇️</button>
     <button id="addBtn" class="ib" aria-label="Añadir foto">➕</button>
     <button id="ordBtn" class="ib" aria-label="Ordenar">↔️</button>
     <button id="delBtn" class="ib" aria-label="Borrar fotos">🗑️</button>
-    <button id="soundBtn" class="ib" aria-label="Sonido">🔊</button>
   </div>
   <div id="gallery"></div>
   <div class="bottom">
@@ -105,14 +116,16 @@ button:disabled{opacity:.6}
     </div>
     <div class="seg" id="sizeRow"></div>
   </div>
+  <button id="homeBtn" class="ib" aria-label="Inicio">🏠</button>
   <div id="pin"><div class="box">
+    <button id="pinX" aria-label="Cerrar">✖</button>
     <div style="font-size:34px">🔒</div>
-    <div class="dots"><i></i><i></i><i></i><i></i></div>
+    <div class="dots" id="pinDots"></div>
     <div class="keys">
       <button>1</button><button>2</button><button>3</button>
       <button>4</button><button>5</button><button>6</button>
       <button>7</button><button>8</button><button>9</button>
-      <button data-k="x" aria-label="Cerrar">✖</button><button>0</button><button data-k="b" aria-label="Borrar">⌫</button>
+      <span></span><button>0</button><button data-k="b" aria-label="Borrar">⌫</button>
     </div>
   </div></div>
   <input type="file" id="file" accept="image/*" multiple hidden>
@@ -148,8 +161,10 @@ const NATIVE=!!(window.Capacitor&&window.Capacitor.isNativePlatform&&window.Capa
 /* ---------- Servidor de puzzles (S3) · ver server/README-S3.md ---------- */
 const BUCKET_URL='https://fbm-622215956948-eu-west-1-an.s3.eu-west-1.amazonaws.com/';
 const WAREHOUSE='juegos/Puzzlea/images_warehouse/';      /* carpeta con listado público (la única) */
-const UPLOAD_URL='https://geqskc34bnqvjw5abnk7mqbnmu0ykdfy.lambda-url.eu-west-1.on.aws/';                                      /* ← pega aquí la Function URL de la Lambda (vacío = ➕ guarda solo en el dispositivo) */
-const UPLOAD_KEY='3_U28kTeCYHnBuTH3b6dxOMr';                  /* clave larga: la misma que la variable UPLOAD_SECRET de la Lambda */
+const UPLOAD_URL='https://geqskc34bnqvjw5abnk7mqbnmu0ykdfy.lambda-url.eu-west-1.on.aws/';                                      /* ← pega aquí la Function URL de la Lambda (vacío = ➕ guarda solo en el dispositivo y la clave se comprueba con PIN_HASH) */
+/* Modo sin servidor (UPLOAD_URL vacío): la clave se comprueba contra esta huella.
+   Con UPLOAD_URL puesto, la clave la comprueba la Lambda: borra el valor de PIN_HASH (déjalo '') y la clave deja de estar en el HTML. */
+const PIN_HASH='';
 
 function toast(t){const e=$('#toast');e.textContent=t;e.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>e.style.display='none',2600)}
 const loadImg=src=>new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=()=>rej(new Error('imagen no válida'));i.src=src});
@@ -224,34 +239,71 @@ function renderGallery(){
   });
 }
 
-/* Añadir fotos pide una clave (para que los niños no las cambien) */
-const PIN='2202';
-let pinVal='';
-function pinDots(){document.querySelectorAll('#pin .dots i').forEach((d,i)=>d.classList.toggle('f',i<pinVal.length))}
-let pinCb=null;
-function askPin(cb){pinCb=cb;pinVal='';pinDots();$('#pin').classList.add('on')}
-document.querySelectorAll('#pin .keys button').forEach(b=>b.onclick=()=>{
-  const k=b.dataset.k;
-  if(k==='x'){$('#pin').classList.remove('on');return}
-  if(k==='b'){pinVal=pinVal.slice(0,-1);pinDots();return}
-  if(pinVal.length>=4)return;
-  pinVal+=b.textContent;pinDots();
-  if(pinVal.length===4){
-    if(pinVal===PIN){$('#pin').classList.remove('on');pinVal='';const cb=pinCb;pinCb=null;if(cb)cb()}
-    else{const p=$('#pin');p.classList.add('bad');setTimeout(()=>{p.classList.remove('bad');pinVal='';pinDots()},400)}
+/* Clave de las herramientas. Con servidor, la comprueba la Lambda (la clave no está en el HTML).
+   Sin red se usa la huella guardada en este dispositivo tras una comprobación correcta. */
+let pinVal='',pinCb=null,sessionPin='';
+function hashPin(s){let h1=0xdeadbeef^0,h2=0x41c6ce57^0;s='puzzlea|'+s;
+  for(let i=0,c;i<s.length;i++){c=s.charCodeAt(i);h1=Math.imul(h1^c,2654435761);h2=Math.imul(h2^c,1597334677)}
+  h1=Math.imul(h1^(h1>>>16),2246822507)^Math.imul(h2^(h2>>>13),3266489909);
+  h2=Math.imul(h2^(h2>>>16),2246822507)^Math.imul(h1^(h1>>>13),3266489909);
+  return (4294967296*(2097151&h2)+(h1>>>0)).toString(36)}
+async function checkPin(pin){
+  if(UPLOAD_URL){
+    try{
+      const ctl=new AbortController(),t=setTimeout(()=>ctl.abort(),9000);
+      const r=await fetch(UPLOAD_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'check',pin}),signal:ctl.signal});
+      clearTimeout(t);
+      if(r.ok){save('pinc',hashPin(pin));return true}
+      if(r.status===403)return false;
+    }catch(e){}
+    let c='';try{c=localStorage.getItem('pinc')||''}catch(e){}
+    return !!c&&hashPin(pin)===c;                      /* sin red */
   }
+  return !!PIN_HASH&&hashPin(pin)===PIN_HASH;
+}
+function pinDots(){
+  const box=$('#pinDots');
+  while(box.children.length<4)box.appendChild(document.createElement('i'));
+  [...box.children].forEach((d,i)=>d.classList.toggle('f',i<pinVal.length));
+}
+function askPin(cb){pinCb=cb;pinVal='';pinDots();$('#pin').classList.add('on')}
+function pinBad(){const p=$('#pin');p.classList.add('bad');setTimeout(()=>{p.classList.remove('bad');pinVal='';pinDots()},400)}
+async function submitPin(){
+  const p=$('#pin');p.classList.add('busy');
+  let ok=false;try{ok=await checkPin(pinVal)}catch(e){}
+  p.classList.remove('busy');
+  if(ok){sessionPin=pinVal;p.classList.remove('on');pinVal='';const cb=pinCb;pinCb=null;if(cb)cb()}
+  else pinBad();
+}
+document.querySelectorAll('#pin .keys button').forEach(b=>b.onclick=()=>{
+  if(pinVal.length>=4||$('#pin').classList.contains('busy'))return;
+  const k=b.dataset.k;
+  if(k==='b'){pinVal=pinVal.slice(0,-1);pinDots();return}
+  pinVal+=b.textContent;pinDots();
+  if(pinVal.length===4)submitPin();                 /* se comprueba al escribir el 4º dígito */
 });
+const closePin=()=>{$('#pin').classList.remove('on');pinVal='';pinCb=null};
+$('#pinX').onclick=closePin;
+$('#pin').addEventListener('pointerdown',e=>{if(e.target===$('#pin'))closePin()});   /* tocar fuera también cierra */
 
-/* Botones de arriba (todos con clave): ➕ añadir, ↔️ ordenar, 🗑️ borrar. Solo se borran las fotos añadidas; las del repo (🔒) no. */
+/* 🔧 Herramientas (con clave): descargar, añadir, ordenar y borrar, ya sin más claves */
+function setTools(on){
+  $('#tools').classList.toggle('on',on);$('#home').classList.toggle('tmode',on);
+  if(!on){setGal(null);sessionPin=''}
+}
+$('#homeBtn').onclick=()=>setTools(false);
+$('#toolBtn').onclick=()=>askPin(()=>setTools(true));
+
+/* ➕ añadir, ↔️ ordenar, 🗑️ borrar. Solo se borran las fotos añadidas; las del repo (🔒) no. */
 function setGal(m){
   galMode=m;pick=-1;
   $('#ordBtn').classList.toggle('on',m==='ord');$('#ordBtn').textContent=m==='ord'?'✔':'↔️';
   $('#delBtn').classList.toggle('on',m==='del');$('#delBtn').textContent=m==='del'?'✔':'🗑️';
   renderGallery();
 }
-$('#addBtn').onclick=()=>{setGal(null);askPin(()=>$('#file').click())};
-$('#delBtn').onclick=()=>{if(galMode==='del')setGal(null);else askPin(()=>setGal('del'))};
-$('#ordBtn').onclick=()=>{if(galMode==='ord')setGal(null);else askPin(()=>setGal('ord'))};
+$('#addBtn').onclick=()=>{setGal(null);$('#file').click()};
+$('#delBtn').onclick=()=>setGal(galMode==='del'?null:'del');
+$('#ordBtn').onclick=()=>setGal(galMode==='ord'?null:'ord');
 
 /* recorta al cuadrado y reduce a 1024 */
 function fileToSquare(file){
@@ -368,7 +420,7 @@ async function syncWarehouse(quiet){
 }
 async function uploadOne(dataUrl,name){
   /* 1) la Lambda comprueba la clave y devuelve un permiso de subida firmado; 2) la foto va directa a S3 */
-  const r=await fetch(UPLOAD_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({key:UPLOAD_KEY,name,type:'image/jpeg'})});
+  const r=await fetch(UPLOAD_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'presign',pin:sessionPin,name,type:'image/jpeg'})});
   if(!r.ok)throw new Error('HTTP '+r.status);
   const p=await r.json();
   const fd=new FormData();Object.entries(p.fields).forEach(([k,v])=>fd.append(k,v));
@@ -376,7 +428,7 @@ async function uploadOne(dataUrl,name){
   const u=await fetch(p.url,{method:'POST',body:fd});
   if(!u.ok)throw new Error('HTTP '+u.status);
 }
-$('#syncBtn').onclick=()=>askPin(()=>syncWarehouse(false));
+$('#syncBtn').onclick=()=>syncWarehouse(false);
 
 
 
@@ -666,7 +718,7 @@ function newShuffle(){
 }
 async function startGame(){
   if(!images.length){toast('🖼️');return}
-  if(galMode)setGal(null);
+  setTools(false);
   show('game');$('#win').classList.remove('on');
   await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
   try{
@@ -701,7 +753,9 @@ peek.addEventListener('pointerleave',off);peek.addEventListener('pointercancel',
 try{
   const A=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.App;
   if(A)A.addListener('backButton',()=>{
-    if($('#game').classList.contains('on'))show('home');else A.exitApp();
+    if($('#pin').classList.contains('on'))$('#pin').classList.remove('on');
+    else if($('#home').classList.contains('tmode'))setTools(false);
+    else if($('#game').classList.contains('on'))show('home');else A.exitApp();
   });
 }catch(e){}
 
