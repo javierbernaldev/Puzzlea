@@ -359,24 +359,43 @@ $('#ordBtn').onclick=()=>setGal(galMode==='ord'?null:'ord');
 
 /* recorta al cuadrado y reduce a 1024 */
 function fileToSquare(file){
-  return new Promise((res,rej)=>{
+  /* Recorta al cuadrado. Si el navegador dibuja negro, prueba otros métodos de lectura antes de rendirse. */
+  const square=(src,w,h)=>{
+    const s=Math.min(w,h),out=Math.min(1024,s);
+    const c=document.createElement('canvas');c.width=c.height=out;
+    const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,out,out);   /* fondo blanco: el JPEG no tiene transparencia y saldría negro */
+    x.drawImage(src,(w-s)/2,(h-s)/2,s,s,0,0,out,out);
+    const d=x.getImageData(0,0,out,out).data;let mx=0;for(let k=0;k<d.length;k+=4*37)mx=Math.max(mx,d[k],d[k+1],d[k+2]);
+    return mx<12?null:c.toDataURL('image/jpeg',.88);
+  };
+  const viaImg=()=>new Promise((res,rej)=>{
     const url=URL.createObjectURL(file),img=new Image();
-    img.onload=()=>{
-      const s=Math.min(img.naturalWidth,img.naturalHeight),out=Math.min(1024,s);
-      const c=document.createElement('canvas');c.width=c.height=out;
-      const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,out,out);   /* fondo blanco: el JPEG no tiene transparencia y saldría negro */
-      x.drawImage(img,(img.naturalWidth-s)/2,(img.naturalHeight-s)/2,s,s,0,0,out,out);
-      URL.revokeObjectURL(url);res(c.toDataURL('image/jpeg',.88));
-    };
+    img.onload=()=>{try{res({out:square(img,img.naturalWidth,img.naturalHeight),w:img.naturalWidth,h:img.naturalHeight})}catch(e){rej(e)}finally{URL.revokeObjectURL(url)}};
     img.onerror=()=>{URL.revokeObjectURL(url);rej(new Error('imagen no válida'))};
     img.src=url;
   });
+  return (async()=>{
+    const r=await viaImg();
+    if(r.out)return r.out;
+    if(window.createImageBitmap){                       /* otra vía de decodificación (y reducida si la foto es enorme) */
+      for(const opt of [undefined,{resizeWidth:r.w>r.h?undefined:1024,resizeHeight:r.w>r.h?1024:undefined,resizeQuality:'high'}]){
+        try{const bm=await (opt?createImageBitmap(file,opt):createImageBitmap(file));const o=square(bm,bm.width,bm.height);if(bm.close)bm.close();if(o)return o}catch(e){}
+      }
+    }
+    try{                                               /* última vía: leer el archivo entero y decodificarlo desde datos en memoria */
+      const du=await new Promise((ok,ko)=>{const fr=new FileReader();fr.onload=()=>ok(fr.result);fr.onerror=()=>ko(fr.error);fr.readAsDataURL(file)});
+      const img=await new Promise((ok,ko)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=()=>ko(new Error('x'));i.src=du});
+      const o=square(img,img.naturalWidth,img.naturalHeight);if(o)return o;
+    }catch(e){}
+    throw new Error('negra: '+(file.type||'?')+' '+r.w+'x'+r.h+' '+Math.round(file.size/1024)+'KB');
+  })();
 }
 $('#file').onchange=async e=>{
   const files=[...e.target.files];e.target.value='';
   let ok=0;
-  for(const f of files){try{await DB.add(await fileToSquare(f));ok++}catch(err){}}
-  if(ok){await loadImages();selected=images.length-1;renderGallery();toast('✅ '+ok)}else toast('❌');
+  let why='';
+  for(const f of files){try{await DB.add(await fileToSquare(f));ok++}catch(err){why=String(err&&err.message||'')}}
+  if(ok){await loadImages();selected=images.length-1;renderGallery();toast('✅ '+ok)}else toast(/^negra/.test(why)?'⬛ '+why:'❌');
 };
 
 /* ---------- Subir y descargar puzzles (S3) ---------- */
@@ -404,6 +423,7 @@ async function httpGet(url,as){            /* as: 'text' | 'blob'. En la app (An
 }
 function netError(e){
   const m=String(e&&e.message||e);
+  if(/^negra/.test(m))return '⬛ '+m;
   if(/HTTP 403/.test(m))return '🔒 403';
   if(/HTTP 404/.test(m))return '❓ 404';
   if(/HTTP \d+/.test(m))return '⚠️ '+m;
@@ -413,6 +433,12 @@ function netError(e){
 const getHidden=()=>{try{return JSON.parse(localStorage.getItem('hidden')||'[]')}catch(e){return[]}};
 const hideKey=k=>{const h=getHidden();if(!h.includes(k)){h.push(k);save('hidden',JSON.stringify(h))}};
 
+async function isBlack(dataUrl){            /* ¿la imagen es toda negra? (descarga defectuosa) */
+  const i=new Image();i.src=dataUrl;await i.decode();
+  const c=document.createElement('canvas');c.width=c.height=16;const x=c.getContext('2d');x.drawImage(i,0,0,16,16);
+  const d=x.getImageData(0,0,16,16).data;let m=0;for(let k=0;k<d.length;k+=4)m=Math.max(m,d[k],d[k+1],d[k+2]);
+  return m<12;
+}
 async function listWarehouse(){            /* la Lambda lista la carpeta privada y da enlaces temporales de descarga */
   const r=await api({action:'list'},20000);
   if(!r.ok)throw new Error('HTTP '+r.status);
@@ -425,7 +451,7 @@ async function syncWarehouse(quiet){
   if(syncing)return;
   syncing=true;const btn=$('#syncBtn');btn.disabled=true;btn.textContent='⏳';
   try{
-    const items=await listWarehouse();
+    const items=await listWarehouse();let lastErr='';
     const hidden=new Set(getHidden());
     const want=items.filter(i=>!hidden.has(i.key));
     const wantKeys=new Set(want.map(i=>i.key));
@@ -437,18 +463,23 @@ async function syncWarehouse(quiet){
       const cur=have.get(it.key);
       if(cur&&cur.etag===it.etag)continue;
       try{
-        const data=await fileToSquare(await httpGet(it.url,'blob'));
+        const blob=await httpGet(it.url,'blob');
+        if(blob.size<200)throw new Error('vacía ('+blob.size+' B)');
+        if(blob.type&&!/^image\//.test(blob.type))throw new Error('tipo '+blob.type);
+        const data=await fileToSquare(blob);
+        if(await isBlack(data))throw new Error('negra ('+blob.size+' B, '+(blob.type||'?')+')');
         if(cur)await DB.del(cur.id);
         await DB.add(data,it.key,it.etag);added++;
-      }catch(e){fail++}
+      }catch(e){fail++;lastErr=String(e&&e.message||e)}
     }
     await loadImages();
-    if(!quiet)toast(fail?('⬇ '+added+'  ⚠️ '+fail):(added?'⬇ '+added:'✅'));
+    if(!quiet)toast(fail?('⬇ '+added+'  ⚠️ '+fail+(lastErr?' · '+lastErr:'')):(added?'⬇ '+added:'✅'));
   }catch(e){
     if(!quiet)toast(netError(e)); else throw e;
   }finally{syncing=false;btn.disabled=false;btn.textContent='⬇️'}
 }
 async function uploadOne(dataUrl){
+  if(await isBlack(dataUrl))throw new Error('negra: no se sube');      /* nunca subir una foto negra */
   /* 1) la Lambda comprueba la clave y devuelve un permiso de subida firmado (409 = ya estaba subida); 2) la foto va directa a S3 */
   const r=await api({action:'presign',pin:sessionPin,hash:await sha(dataUrl)},20000);
   if(r.status===409)return true;
