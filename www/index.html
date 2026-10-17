@@ -77,8 +77,9 @@ button:disabled{opacity:.6}
 #homeBtn{display:none;align-self:center;width:96px;height:56px;border-radius:28px;font-size:30px;background:var(--card2);margin-top:auto}
 #home.tmode .bottom,#home.tmode #toolBtn{display:none}
 #home.tmode #homeBtn{display:grid}
+#tools .ib[hidden]{display:none}
 #tools .ib{width:56px;height:56px;font-size:26px;background:var(--card2)}
-#delBtn.on,#ordBtn.on{background:var(--ok);color:#0b3d1f}
+#delBtn.on,#ordBtn.on,#upBtn.on{background:var(--ok);color:#0b3d1f}
 @keyframes wob{from{transform:rotate(-1.2deg)}to{transform:rotate(1.2deg)}}
 #pin{position:fixed;inset:0;background:#000c;display:none;align-items:center;justify-content:center;z-index:90}
 #pin.on{display:flex}
@@ -88,6 +89,16 @@ button:disabled{opacity:.6}
 #pin .dots i.f{background:var(--acc);border-color:var(--acc)}
 #pin .keys{display:grid;grid-template-columns:repeat(3,64px);gap:10px}
 #pin #pinX{position:absolute;right:-12px;top:-12px;width:44px;height:44px;border-radius:50%;background:#e5484d;color:#fff;font-size:20px;padding:0;display:grid;place-items:center;box-shadow:0 3px 8px #0009}
+#gate{position:fixed;inset:0;background:var(--bg);display:none;flex-direction:column;align-items:center;justify-content:center;gap:18px;z-index:100;padding:24px}
+#gate.on{display:flex}
+#gate .ico{font-size:72px}
+#gate .row{display:flex;gap:10px;width:min(420px,100%)}
+#gate input{flex:1;min-width:0;font:inherit;font-size:20px;padding:14px 16px;border-radius:16px;border:3px solid var(--card2);background:var(--card);color:var(--ink)}
+#gate input:focus{outline:0;border-color:var(--acc)}
+#gate button{width:56px;padding:0;font-size:24px;background:var(--card2)}
+#gate #gateGo{background:var(--acc);color:#1b1f3b}
+#gate.bad .row{animation:shake .35s}
+#gate.busy .row{opacity:.6;pointer-events:none}
 #pin.busy .box{opacity:.6;pointer-events:none}
 #pin .keys button{height:64px;font-size:26px;background:#ffffff18;padding:0}
 #pin.bad .box{animation:shake .35s}
@@ -105,6 +116,7 @@ button:disabled{opacity:.6}
   <div id="tools" class="tools">
     <button id="syncBtn" class="ib" aria-label="Descargar">⬇️</button>
     <button id="addBtn" class="ib" aria-label="Añadir foto">➕</button>
+    <button id="upBtn" class="ib" aria-label="Subir a la nube" hidden>⬆️</button>
     <button id="ordBtn" class="ib" aria-label="Ordenar">↔️</button>
     <button id="delBtn" class="ib" aria-label="Borrar fotos">🗑️</button>
   </div>
@@ -129,6 +141,15 @@ button:disabled{opacity:.6}
     </div>
   </div></div>
   <input type="file" id="file" accept="image/*" multiple hidden>
+</div>
+
+<div id="gate">
+  <div class="ico">🔑</div>
+  <form class="row" id="gateForm" autocomplete="off">
+    <input id="gatePass" type="password" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Contraseña">
+    <button type="button" id="gateEye" aria-label="Mostrar">👁</button>
+    <button type="submit" id="gateGo" aria-label="Entrar">➡️</button>
+  </form>
 </div>
 
 <div id="game" class="screen">
@@ -159,9 +180,7 @@ const DPR=Math.min(window.devicePixelRatio||1,2.5);
 const NATIVE=!!(window.Capacitor&&window.Capacitor.isNativePlatform&&window.Capacitor.isNativePlatform());
 
 /* ---------- Servidor de puzzles (S3) · ver server/README-S3.md ---------- */
-const BUCKET_URL='https://fbm-622215956948-eu-west-1-an.s3.eu-west-1.amazonaws.com/';
-const WAREHOUSE='juegos/Puzzlea/images_warehouse/';      /* carpeta con listado público (la única) */
-const UPLOAD_URL='https://geqskc34bnqvjw5abnk7mqbnmu0ykdfy.lambda-url.eu-west-1.on.aws/';                                      /* ← pega aquí la Function URL de la Lambda (vacío = ➕ guarda solo en el dispositivo y la clave se comprueba con PIN_HASH) */
+const UPLOAD_URL='https://geqskc34bnqvjw5abnk7mqbnmu0ykdfy.lambda-url.eu-west-1.on.aws/';                                      /* ← pega aquí la Function URL de la Lambda (vacío = modo sin servidor: sin contraseña de entrada, ➕ guarda solo en el dispositivo y el PIN se comprueba con PIN_HASH) */
 /* Modo sin servidor (UPLOAD_URL vacío): la clave se comprueba contra esta huella.
    Con UPLOAD_URL puesto, la clave la comprueba la Lambda: borra el valor de PIN_HASH (déjalo '') y la clave deja de estar en el HTML. */
 const PIN_HASH='';
@@ -182,7 +201,7 @@ const DB={
 };
 
 /* ---------- Estado y ajustes (se guardan de una vez para otra) ---------- */
-let galMode=null, pick=-1;   /* galMode: null | 'del' | 'ord' */
+let galMode=null, pick=-1;   /* galMode: null | 'del' | 'ord' | 'up' */
 let images=[], selected=0, mode='jigsaw', N=3, sound=true;
 const save=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
 try{
@@ -214,7 +233,7 @@ async function loadImages(){
   renderGallery();
 }
 function renderGallery(){
-  const g=$('#gallery');g.innerHTML='';g.classList.toggle('del',galMode==='del');g.classList.toggle('ord',galMode==='ord');
+  const g=$('#gallery');g.innerHTML='';g.classList.toggle('del',galMode==='del');g.classList.toggle('ord',galMode==='ord');g.classList.toggle('del',galMode==='del'||galMode==='up');
   if(!images.length){const e=document.createElement('div');e.className='empty';e.textContent='🖼️';g.appendChild(e)}
   images.forEach((im,i)=>{
     const d=document.createElement('div');d.className='thumb'+(galMode===null&&i===selected?' sel':'')+(galMode==='ord'&&i===pick?' pick':'');
@@ -224,6 +243,14 @@ function renderGallery(){
       else{const x=document.createElement('button');x.className='x';x.textContent='✖';x.setAttribute('aria-label','Borrar');
         x.onclick=async e=>{e.stopPropagation();try{await DB.del(im.id);if(im.src)hideKey(im.src)}catch(err){toast('❌');return}
           await loadImages()};
+        d.appendChild(x)}
+    }else if(galMode==='up'){
+      if(im.builtin||im.src||(im.id!=null&&cloudHas(im.id))){const l=document.createElement('span');l.className='lock';l.textContent=im.builtin?'🔒':'☁️';d.appendChild(l)}
+      else{const x=document.createElement('button');x.className='x';x.textContent='⬆️';x.setAttribute('aria-label','Subir');
+        x.style.background='var(--ok)';
+        x.onclick=async e=>{e.stopPropagation();x.textContent='⏳';x.disabled=true;
+          try{const dup=await uploadOne(im.data);await DB.del(im.id);await syncWarehouse(true);await prepUp();renderGallery();toast(dup?'☁️':'⬆ 1')}
+          catch(err){toast(netError(err));renderGallery()}};
         d.appendChild(x)}
     }else if(galMode==='ord'){
       const n=document.createElement('span');n.className='n';n.textContent=i+1;d.appendChild(n);
@@ -247,14 +274,22 @@ function hashPin(s){let h1=0xdeadbeef^0,h2=0x41c6ce57^0;s='puzzlea|'+s;
   h1=Math.imul(h1^(h1>>>16),2246822507)^Math.imul(h2^(h2>>>13),3266489909);
   h2=Math.imul(h2^(h2>>>16),2246822507)^Math.imul(h1^(h1>>>13),3266489909);
   return (4294967296*(2097151&h2)+(h1>>>0)).toString(36)}
+/* Todo lo privado pasa por la Lambda. La sesión (token) vive solo en memoria: al cerrar la app hay que volver a entrar. */
+let token='';
+async function api(body,ms){
+  const ctl=new AbortController(),t=setTimeout(()=>ctl.abort(),ms||15000);
+  try{
+    const r=await fetch(UPLOAD_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(Object.assign({token},body)),signal:ctl.signal});
+    if(r.status===401){token='';showGate(true)}
+    return r;
+  }finally{clearTimeout(t)}
+}
 async function checkPin(pin){
   if(UPLOAD_URL){
     try{
-      const ctl=new AbortController(),t=setTimeout(()=>ctl.abort(),9000);
-      const r=await fetch(UPLOAD_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'check',pin}),signal:ctl.signal});
-      clearTimeout(t);
+      const r=await api({action:'check',pin},9000);
       if(r.ok){save('pinc',hashPin(pin));return true}
-      if(r.status===403)return false;
+      if(r.status===403||r.status===401)return false;
     }catch(e){}
     let c='';try{c=localStorage.getItem('pinc')||''}catch(e){}
     return !!c&&hashPin(pin)===c;                      /* sin red */
@@ -295,13 +330,30 @@ $('#homeBtn').onclick=()=>setTools(false);
 $('#toolBtn').onclick=()=>askPin(()=>setTools(true));
 
 /* ➕ añadir, ↔️ ordenar, 🗑️ borrar. Solo se borran las fotos añadidas; las del repo (🔒) no. */
+/* Huella (SHA-256) del contenido: es el nombre de la foto en S3, así que la misma foto nunca se sube dos veces */
+async function sha(dataUrl){
+  const buf=await (await fetch(dataUrl)).arrayBuffer();
+  if(window.crypto&&crypto.subtle)return [...new Uint8Array(await crypto.subtle.digest('SHA-256',buf))].map(b=>b.toString(16).padStart(2,'0')).join('');
+  let h='';for(let k=0;k<4;k++){let a=0x9e3779b9^k,b=0x85ebca6b+k;const u=new Uint8Array(buf);
+    for(let i=0;i<u.length;i++){a=Math.imul(a^u[i],2654435761);b=Math.imul(b^u[i],1597334677);a^=b>>>15}
+    h+=((a>>>0).toString(16).padStart(8,'0')+(b>>>0).toString(16).padStart(8,'0'))}
+  return h.slice(0,32)}
+const hashes=new Map(),cloudKeys=new Set();
+const cloudHas=id=>hashes.has(id)&&cloudKeys.has(hashes.get(id).slice(0,32));
+async function prepUp(){                          /* qué fotos del móvil ya están en la nube */
+  try{const r=await api({action:'list'},15000);if(r.ok)cloudKeys.clear(),(await r.json()).items.forEach(i=>{const m=i.key.match(/([0-9a-f]{32})\.jpg$/);if(m)cloudKeys.add(m[1])})}catch(e){}
+  for(const im of images)if(!im.builtin&&!im.src&&im.id!=null&&!hashes.has(im.id)){try{hashes.set(im.id,await sha(im.data))}catch(e){}}
+}
 function setGal(m){
   galMode=m;pick=-1;
   $('#ordBtn').classList.toggle('on',m==='ord');$('#ordBtn').textContent=m==='ord'?'✔':'↔️';
+  $('#upBtn').classList.toggle('on',m==='up');$('#upBtn').textContent=m==='up'?'✔':'⬆️';
   $('#delBtn').classList.toggle('on',m==='del');$('#delBtn').textContent=m==='del'?'✔':'🗑️';
   renderGallery();
 }
 $('#addBtn').onclick=()=>{setGal(null);$('#file').click()};
+$('#upBtn').hidden=!UPLOAD_URL;
+$('#upBtn').onclick=async()=>{if(galMode==='up')return setGal(null);setGal('up');await prepUp();if(galMode==='up')renderGallery()};
 $('#delBtn').onclick=()=>setGal(galMode==='del'?null:'del');
 $('#ordBtn').onclick=()=>setGal(galMode==='ord'?null:'ord');
 
@@ -321,23 +373,12 @@ function fileToSquare(file){
 }
 $('#file').onchange=async e=>{
   const files=[...e.target.files];e.target.value='';
-  let ok=0,fail=0;
-  if(UPLOAD_URL){                                  /* sube a S3 (carpeta images_warehouse) y luego sincroniza */
-    const b=$('#addBtn');b.disabled=true;b.textContent='⏳';
-    for(const f of files){
-      try{await uploadOne(await fileToSquare(f),f.name.replace(/\.[^.]*$/,'')+'.jpg');ok++}catch(err){fail++}
-    }
-    b.disabled=false;b.textContent='➕';
-    if(ok)await syncWarehouse(true);
-    toast(ok?(fail?'⬆ '+ok+'  ⚠️ '+fail:'⬆ '+ok):'❌');
-  }else{                                           /* sin servidor: se guarda solo en este dispositivo */
-    for(const f of files){try{await DB.add(await fileToSquare(f));ok++}catch(err){}}
-    if(ok){await loadImages();selected=images.length-1;renderGallery();toast('✅ '+ok)}else toast('❌');
-  }
+  let ok=0;
+  for(const f of files){try{await DB.add(await fileToSquare(f));ok++}catch(err){}}
+  if(ok){await loadImages();selected=images.length-1;renderGallery();toast('✅ '+ok)}else toast('❌');
 };
 
 /* ---------- Subir y descargar puzzles (S3) ---------- */
-const keyUrl=k=>BUCKET_URL+k.split('/').map(encodeURIComponent).join('/');
 const IMG_RE=/\.(jpe?g|png|webp|gif|bmp|avif)$/i;
 function b64Blob(b64,type){
   const bin=atob(b64),u8=new Uint8Array(bin.length);
@@ -371,22 +412,10 @@ function netError(e){
 const getHidden=()=>{try{return JSON.parse(localStorage.getItem('hidden')||'[]')}catch(e){return[]}};
 const hideKey=k=>{const h=getHidden();if(!h.includes(k)){h.push(k);save('hidden',JSON.stringify(h))}};
 
-async function listWarehouse(){
-  const out=[];let token='';
-  do{
-    const q=new URL(BUCKET_URL);
-    q.searchParams.set('list-type','2');q.searchParams.set('prefix',WAREHOUSE);
-    if(token)q.searchParams.set('continuation-token',token);
-    const x=new DOMParser().parseFromString(await httpGet(q.toString(),'text'),'application/xml');
-    for(const c of x.getElementsByTagName('Contents')){
-      const key=c.getElementsByTagName('Key')[0].textContent;
-      const et=c.getElementsByTagName('ETag')[0];
-      if(IMG_RE.test(key))out.push({key,etag:et?et.textContent:''});
-    }
-    const tr=x.getElementsByTagName('IsTruncated')[0],nx=x.getElementsByTagName('NextContinuationToken')[0];
-    token=(tr&&tr.textContent==='true'&&nx)?nx.textContent:'';
-  }while(token);
-  return out;
+async function listWarehouse(){            /* la Lambda lista la carpeta privada y da enlaces temporales de descarga */
+  const r=await api({action:'list'},20000);
+  if(!r.ok)throw new Error('HTTP '+r.status);
+  return (await r.json()).items.filter(i=>IMG_RE.test(i.key));
 }
 /* Deja los puzzles descargados igual que la carpeta de S3: baja los nuevos o cambiados y quita los que ya no están.
    Las fotos propias (➕ sin servidor) y las del repo no se tocan. */
@@ -407,7 +436,7 @@ async function syncWarehouse(quiet){
       const cur=have.get(it.key);
       if(cur&&cur.etag===it.etag)continue;
       try{
-        const data=await fileToSquare(await httpGet(keyUrl(it.key),'blob'));
+        const data=await fileToSquare(await httpGet(it.url,'blob'));
         if(cur)await DB.del(cur.id);
         await DB.add(data,it.key,it.etag);added++;
       }catch(e){fail++}
@@ -418,17 +447,47 @@ async function syncWarehouse(quiet){
     if(!quiet)toast(netError(e)); else throw e;
   }finally{syncing=false;btn.disabled=false;btn.textContent='⬇️'}
 }
-async function uploadOne(dataUrl,name){
-  /* 1) la Lambda comprueba la clave y devuelve un permiso de subida firmado; 2) la foto va directa a S3 */
-  const r=await fetch(UPLOAD_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'presign',pin:sessionPin,name,type:'image/jpeg'})});
+async function uploadOne(dataUrl){
+  /* 1) la Lambda comprueba la clave y devuelve un permiso de subida firmado (409 = ya estaba subida); 2) la foto va directa a S3 */
+  const r=await api({action:'presign',pin:sessionPin,hash:await sha(dataUrl)},20000);
+  if(r.status===409)return true;
   if(!r.ok)throw new Error('HTTP '+r.status);
   const p=await r.json();
   const fd=new FormData();Object.entries(p.fields).forEach(([k,v])=>fd.append(k,v));
   fd.append('file',await (await fetch(dataUrl)).blob());          /* el fichero va siempre el último */
   const u=await fetch(p.url,{method:'POST',body:fd});
   if(!u.ok)throw new Error('HTTP '+u.status);
+  return false;
 }
 $('#syncBtn').onclick=()=>syncWarehouse(false);
+
+/* 🔑 Contraseña de entrada (compartida). Se pide cada vez que se abre la app. La comprueba la Lambda; no está en el código.
+   Sin red solo entra quien ya la había puesto antes en este dispositivo (se guarda una huella, no la contraseña). */
+function showGate(bad){
+  const g=$('#gate');g.classList.add('on');
+  if(bad){g.classList.add('bad');setTimeout(()=>g.classList.remove('bad'),400)}
+  $('#gatePass').value='';setTimeout(()=>$('#gatePass').focus(),50);
+}
+$('#gateEye').onclick=()=>{const i=$('#gatePass');i.type=i.type==='password'?'text':'password'};
+$('#gateForm').onsubmit=async e=>{
+  e.preventDefault();
+  const g=$('#gate'),pw=$('#gatePass').value;
+  if(!pw||g.classList.contains('busy'))return;
+  g.classList.add('busy');
+  let ok=false,offline=false;
+  try{
+    const ctl=new AbortController(),t=setTimeout(()=>ctl.abort(),12000);
+    const r=await fetch(UPLOAD_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'login',pass:pw}),signal:ctl.signal});
+    clearTimeout(t);
+    if(r.ok){token=(await r.json()).token;save('passc',hashPin('pw|'+pw));ok=true}
+    else if(r.status!==403)offline=true;
+  }catch(err){offline=true}
+  if(offline){let c='';try{c=localStorage.getItem('passc')||''}catch(err){}ok=!!c&&hashPin('pw|'+pw)===c}
+  g.classList.remove('busy');
+  if(ok){g.classList.remove('on');$('#gatePass').value='';$('#gatePass').type='password'}
+  else showGate(true);
+};
+if(UPLOAD_URL)showGate(false);
 
 
 
@@ -753,6 +812,7 @@ peek.addEventListener('pointerleave',off);peek.addEventListener('pointercancel',
 try{
   const A=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.App;
   if(A)A.addListener('backButton',()=>{
+    if($('#gate').classList.contains('on'))return;
     if($('#pin').classList.contains('on'))$('#pin').classList.remove('on');
     else if($('#home').classList.contains('tmode'))setTools(false);
     else if($('#game').classList.contains('on'))show('home');else A.exitApp();
