@@ -364,7 +364,8 @@ function fileToSquare(file){
     img.onload=()=>{
       const s=Math.min(img.naturalWidth,img.naturalHeight),out=Math.min(1024,s);
       const c=document.createElement('canvas');c.width=c.height=out;
-      c.getContext('2d').drawImage(img,(img.naturalWidth-s)/2,(img.naturalHeight-s)/2,s,s,0,0,out,out);
+      const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,out,out);   /* fondo blanco: el JPEG no tiene transparencia y saldría negro */
+      x.drawImage(img,(img.naturalWidth-s)/2,(img.naturalHeight-s)/2,s,s,0,0,out,out);
       URL.revokeObjectURL(url);res(c.toDataURL('image/jpeg',.88));
     };
     img.onerror=()=>{URL.revokeObjectURL(url);rej(new Error('imagen no válida'))};
